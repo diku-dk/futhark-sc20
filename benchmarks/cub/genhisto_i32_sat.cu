@@ -1,6 +1,24 @@
 #include "../../cub-1.8.0/cub/cub.cuh"   // or equivalently <cub/device/device_histogram.cuh>
 #include "helper.cu.h"
 
+template<class Z>
+bool validateZ(Z* A, Z* B, uint32_t sizeAB) {
+    for(uint32_t i = 0; i < sizeAB; i++)
+      if (A[i] != B[i]){
+        printf("INVALID RESULT %d (%d, %d)\n", i, A[i], B[i]);
+        return false;
+      }
+    printf("VALID RESULT!\n");
+    return true;
+}
+
+void randomInitNat(uint32_t* data, const uint32_t size, const uint32_t H) {
+    for (int i = 0; i < size; ++i) {
+        unsigned long int r = rand();
+        data[i] = r % H;
+    }
+}
+
 #define GPU_RUNS    50
 
 struct SatAdd
@@ -50,11 +68,11 @@ double sortRedByKeyCUB( uint32_t* data_keys_in, uint8_t* histo
                                       );
         cudaMalloc(&tmp_sort_mem, tmp_sort_len);
     }
+    cudaCheckError();
 
     void * tmp_red_mem = NULL;
     size_t tmp_red_len = 0;
     SatAdd redop;
-    
 
     { // reduce-by-key prelude
         cub::DeviceReduce::ReduceByKey  ( tmp_red_mem, tmp_red_len
@@ -64,6 +82,7 @@ double sortRedByKeyCUB( uint32_t* data_keys_in, uint8_t* histo
                                         );
         cudaMalloc(&tmp_red_mem, tmp_red_len);
     }
+    cudaCheckError();
 
     { // one dry run
         cub::DeviceRadixSort::SortKeys( tmp_sort_mem, tmp_sort_len
@@ -75,8 +94,9 @@ double sortRedByKeyCUB( uint32_t* data_keys_in, uint8_t* histo
                                       , data_vals,     histo
                                       , num_segments, redop, (int)N
                                       );
-        cudaThreadSynchronize();
+        cudaDeviceSynchronize();
     }
+    cudaCheckError();
 
     // timing
     double elapsed;
@@ -107,7 +127,8 @@ double sortRedByKeyCUB( uint32_t* data_keys_in, uint8_t* histo
                                       , num_segments, redop, (int)N
                                       );
     }
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
+    cudaCheckError();
 
     gettimeofday(&t_end, NULL);
     timeval_subtract(&t_diff, &t_end, &t_start);
@@ -125,8 +146,8 @@ double sortRedByKeyCUB( uint32_t* data_keys_in, uint8_t* histo
 
 
 int main (int argc, char * argv[]) {
-    if(argc != 3) {
-        printf("Expects two arguments: the image size and the histogram size! argc:%d\n", argc);
+    if (argc != 3) {
+        printf("Usage: %s <image size> <histogram size>\n", argv[0]);
         exit(1);
     }
     const uint32_t N = atoi(argv[1]);
@@ -155,26 +176,25 @@ int main (int argc, char * argv[]) {
     //Allocate and Initialize Device data
     uint32_t* d_keys;
     uint8_t*  d_histo;
-    cudaMalloc ((void**) &d_keys,  N * sizeof(uint32_t));
-    cudaMalloc ((void**) &d_histo, H * sizeof(uint8_t));
-    cudaMemcpy(d_keys, h_keys, N * sizeof(uint32_t), cudaMemcpyHostToDevice);
+    cudaSucceeded(cudaMalloc((void**) &d_keys,  N * sizeof(uint32_t)));
+    cudaSucceeded(cudaMalloc((void**) &d_histo, H * sizeof(uint8_t)));
+    cudaSucceeded(cudaMemcpy(d_keys, h_keys, N * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    {
-        double elapsed = 
-            sortRedByKeyCUB ( d_keys, d_histo, N, H );
+    double elapsed = sortRedByKeyCUB( d_keys, d_histo, N, H );
 
-        cudaMemcpy (h_histo, d_histo, H*sizeof(uint8_t), cudaMemcpyDeviceToHost);
-        printf("CUB Uint8-Saturated-Add Histogram ... ");
-        validateZ<uint8_t>(g_histo, h_histo, H);
+    cudaMemcpy(h_histo, d_histo, H*sizeof(uint8_t), cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
+    cudaCheckError();
+    printf("CUB Uint8-Saturated-Add Histogram ... ");
+    bool success = validateZ<uint8_t>(g_histo, h_histo, H);
 
-        printf("CUB Uint8-Saturated-Add Histogram runs in: %.2f microsecs\n", elapsed);
-        double gigaBytesPerSec = N * (sizeof(uint32_t) + 2*sizeof(uint8_t)) * 1.0e-3f / elapsed; 
-        printf("CUB Uint8-Saturated-Add Histogram GBytes/sec = %.2f!\n", gigaBytesPerSec); 
-    }
+    printf("CUB Uint8-Saturated-Add Histogram runs in: %.2f microsecs\n", elapsed);
+    double gigaBytesPerSec = N * (sizeof(uint32_t) + 2*sizeof(uint8_t)) * 1.0e-3f / elapsed; 
+    printf("CUB Uint8-Saturated-Add Histogram GBytes/sec = %.2f!\n", gigaBytesPerSec); 
 
     // Cleanup and closing
     cudaFree(d_keys); cudaFree(d_histo);
     free(h_keys); free(g_histo); free(h_histo);
 
-    return 0;
+    return success ? 0 : 1;
 }
