@@ -1,5 +1,5 @@
 CXX        = nvcc -O3
-CUB="../../cub-1.8.0/cub"
+CUB?="../../../cub-1.8.0/cub"
 
 SRC1 = histo-atomicIncrem.cu
 HELPERS1 = helper.cu.h
