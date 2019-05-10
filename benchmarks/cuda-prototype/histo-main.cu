@@ -40,6 +40,10 @@ unsigned int BLOCK_SZ;
 int optimSubHistoDeg(const AtomicPrim prim_kind, const int Q, const int H) {
     const int el_size = (prim_kind == XCHG)? 2*sizeof(int) : sizeof(int);
     const int m = ((Q*4 / el_size) * BLOCK) / H;
+    // cooperation level can be define independently as
+    //     C = min(H/k, B) for some smallish k, or
+    // derived from M as
+    //     C = ceil(BLOCK/M)
     //const int coop = (BLOCK + m - 1) / m;
     //printf("COOP LEVEL: %d, subhistogram degree: %d\n", coop, m);
     return min(m, BLOCK);

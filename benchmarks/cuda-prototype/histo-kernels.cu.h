@@ -12,8 +12,7 @@ struct indval {
 template<class T>
 __device__ __host__ inline
 struct indval<T>
-f(T pixel, int his_sz)
-{
+f(T pixel, int his_sz) {
   const int ratio = max(1, his_sz/RACE_FACT);
   struct indval<T> iv;
   iv.index = ((int)pixel) % ratio;
@@ -22,20 +21,12 @@ f(T pixel, int his_sz)
 }
 
 __global__ void
-naive_reduce_kernel (
-              int * d_his,
-              int * d_res,
-              int his_sz,
-              int num_hists )
-{
+naive_reduce_kernel (int * d_his, int * d_res, int his_sz, int num_hists) {
     const unsigned int gid = blockIdx.x * blockDim.x + threadIdx.x;
-
-    // sum bins
     int sum = 0;
     if(gid < his_sz) {
-        for(int i=gid; i<num_hists * his_sz; i+=his_sz) {
+        for(int i=gid; i<num_hists * his_sz; i+=his_sz)
             sum += d_his[i];
-        }
         d_res[gid] = sum;
     }
 }
@@ -43,48 +34,37 @@ naive_reduce_kernel (
 /**********************************************/
 /*** The three primitives for atomic update ***/
 /**********************************************/
-
-class HWDAddPrim {
-  public:
-    __device__ inline static void
-    atomicAddPrim(volatile int* loc_hists, volatile int* locks, int idx, int v) {
-        atomicAdd((int*)&loc_hists[idx], v);
-    }
-};
-
-class CASAddPrim {
-  public:
-    __device__ inline static void
-    atomicAddPrim(volatile int* loc_hists, volatile int* locks, int idx, int v) {
-        int old = loc_hists[idx];
-        int assumed;
-        do {
-            assumed = old;
-            old = atomicCAS( (int*)&loc_hists[idx]
-                           , assumed
-                           , assumed + v
-                           );
-        } while(assumed != old);
-    }
-};
-
-
-class XCGAddPrim {
-  public:
-    __device__ inline static void
-    atomicAddPrim(volatile int* loc_hists, volatile int* loc_locks, int idx, int v) {
-        bool done = false;
-        do {
-            if( atomicExch((int *)&loc_locks[idx], 1) == 0 ) {
-                loc_hists[idx] += v;
-                atomicExch((int *)&loc_locks[idx], 0);
-                //__threadfence();
-                //loc_locks[lhid + iv.index] = 0;
-                done = true;
-            }
-        } while (!done);
-    }
-};
+__device__ inline static void
+atomADD(volatile int* loc_hists, volatile int* locks, int idx, int v) {
+    atomicAdd((int*)&loc_hists[idx], v);
+}
+__device__ inline static void
+atomCAS(volatile int* loc_hists, volatile int* locks, int idx, int v) {
+    int old = loc_hists[idx];
+    int assumed;
+    do {
+        assumed = old;
+        old = atomicCAS( (int*)&loc_hists[idx], assumed, assumed + v );
+    } while(assumed != old);
+}
+__device__ inline static void
+atomXCG(volatile int* loc_hists, volatile int* loc_locks, int idx, int v) {
+    bool done = false;
+    do {
+        if( atomicExch((int *)&loc_locks[idx], 1) == 0 ) {
+            loc_hists[idx] += v;
+            atomicExch((int *)&loc_locks[idx], 0);
+            done = true;
+        }
+    } while (!done);
+}
+// compile-time selector of atomic-update primitive
+template<AtomicPrim primKind> __device__ inline void
+atomicAddPrim(volatile int* loc_hists, volatile int* locks, int idx, int v) {
+    if      (primKind == ADD)  atomADD(loc_hists, NULL,  idx, v);
+    else if (primKind == CAS)  atomCAS(loc_hists, NULL,  idx, v);
+    else/*(primKind == XCHG)*/ atomXCG(loc_hists, locks, idx, v);
+}
 
 /**********************************************/
 
@@ -122,14 +102,7 @@ locMemHwdAddCoopKernel( const int N, const int H,
     {
         for(int i=gid; i<N; i+=num_threads) {
             struct indval<int> iv = f<int>(d_input[i], H);
-
-            if(primKind == ADD) {
-                HWDAddPrim::atomicAddPrim(loc_hists, NULL, lhid + iv.index, iv.value);
-            } else if (primKind == CAS) {
-                CASAddPrim::atomicAddPrim(loc_hists, NULL, lhid + iv.index, iv.value);
-            } else { // primKind == XCHG
-                XCGAddPrim::atomicAddPrim(loc_hists, loc_hists + his_block_sz, lhid + iv.index, iv.value);
-            }
+            atomicAddPrim<primKind>(loc_hists, loc_hists+his_block_sz, lhid + iv.index, iv.value);
         }
     }
     __syncthreads();
