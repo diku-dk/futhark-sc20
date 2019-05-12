@@ -6,11 +6,11 @@
 #include <time.h> 
 
 #define BLOCK       1024
-#define GPU_RUNS    200
+#define GPU_RUNS    250
 #define CPU_RUNS    1
 
 #define INP_LEN     50000000
-#define Hmax        100000
+#define Hmax        500000
  
 #ifndef DEBUG_INFO
 #define DEBUG_INFO  0
@@ -102,6 +102,33 @@ void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
 }
 
 
+void runGlobalMemDataset(int* h_input, int* h_histo, int* d_input) {
+    const int num_histos = 5;
+    const int num_m_degs = 5;
+    const int algn = 0;
+    const int histo_sizes[num_histos] = { 1*12*1024-algn, 2*12*1024-algn, 4*12*1024-algn, 8*12*1024-algn, 16*12*1024-algn };
+
+    unsigned long runtimes[3][num_histos][num_m_degs];
+
+    for(int i=0; i<num_histos; i++) {
+        const int H = histo_sizes[i];
+        const float subhisto_degs[5] = { 0.001, 1.0, 3.0, 6.0, 12.0 };
+
+        goldSeqHisto(INP_LEN, H, h_input, h_histo);
+
+        for(int j=0; j<num_m_degs; j++) {
+            const float k = subhisto_degs[j];
+            const int   B = 256;
+            runtimes[0][i][j] = glbMemHwdAddCoop(ADD,  INP_LEN, H, k, B, d_input, h_histo);
+            runtimes[1][i][j] = glbMemHwdAddCoop(CAS,  INP_LEN, H, k, B, d_input, h_histo);
+            runtimes[2][i][j] = glbMemHwdAddCoop(XCHG, INP_LEN, H, k, B, d_input, h_histo);
+        }
+    }
+
+    printTextTab(runtimes, histo_sizes, RACE_FACT);
+    //printLaTex  (runtimes, histo_sizes, RACE_FACT);
+}
+
 /////////////////////////////////////////////////////////
 // Program main
 /////////////////////////////////////////////////////////
@@ -170,13 +197,28 @@ int main() {
     }
 #endif
 
-#if 1
+#if 0
+    {
+        const int   H = 12288;
+        const float k = 0.001;
+        const int   B = 256;
+        unsigned long tm_seq = goldSeqHisto(INP_LEN, H, h_input, h_histo);
+        printf("Before GPU XCG!\n");
+        unsigned long tm_xch = glbMemHwdAddCoop(XCHG, INP_LEN, H, k, B, d_input, h_histo);
+        printf("Histogram Global-Mem XCG with subhisto-degree %f took: %lu microsecs\n", k, tm_xch);
+    }
+#endif
+
+
+#if 0
     runLocalMemDataset(h_input, h_histo, d_input);
 #endif
 
+#if 1
+    runGlobalMemDataset(h_input, h_histo, d_input);
+#endif
     // 7. clean up memory
     free(h_input);
     free(h_histo);
     cudaFree(d_input);
 }
-

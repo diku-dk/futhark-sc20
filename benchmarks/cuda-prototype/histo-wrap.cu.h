@@ -1,6 +1,9 @@
 #ifndef HISTO_WRAPPER
 #define HISTO_WRAPPER
 
+/***********************/
+/*** Various Helpers ***/
+/***********************/
 int timeval_subtract(struct timeval *result, struct timeval *t2, struct timeval *t1)
 {
     unsigned int resolution=1000000;
@@ -9,17 +12,14 @@ int timeval_subtract(struct timeval *result, struct timeval *t2, struct timeval 
     result->tv_usec = diff % resolution;
     return (diff<0);
 }
-
 void randomInit(int* data, int size) {
     for (int i = 0; i < size; ++i)
         data[i] = rand(); // (float)RAND_MAX;
 }
-
 void zeroOut(int* data, int size) {
     for (int i = 0; i < size; ++i)
         data[i] = 0;
 }
-
 template<class T>
 bool validate(T* A, T* B, unsigned int sizeAB) {
     for(int i = 0; i < sizeAB; i++) {
@@ -31,7 +31,16 @@ bool validate(T* A, T* B, unsigned int sizeAB) {
     //printf("VALID RESULT!\n");
     return true;
 }
-
+int gpuAssert(cudaError_t code) {
+  if(code != cudaSuccess) {
+    printf("GPU Error: %s\n", cudaGetErrorString(code));
+    return -1;
+  }
+  return 0;
+}
+/**********************************/
+/*** Golden Sequntial Histogram ***/
+/**********************************/
 void computeSeqHisto(const int N, const int H, int* input, int* histo) {
     for(int i=0; i<N; i++) {
         struct indval<int> iv = f<int>(input[i], H);
@@ -57,6 +66,9 @@ goldSeqHisto(const int N, const int H, int* input, int* histo) {
     return (elapsed / CPU_RUNS); 
 }
 
+/*******************************/
+/*** Local-Memory Histograms ***/
+/*******************************/
 unsigned long
 locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_per_block, int* d_input, int* h_ref_histo) {
     if(histos_per_block <= 0) {
@@ -76,8 +88,6 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
     cudaMalloc((void**) &d_histos, mem_size_histos);
     cudaMalloc((void**) &d_histo,  H * sizeof(int));
 
-    //printf("multi-histogram degree: %d, H:%d\n", histos_per_block, H);
-
     { // dry run
       if(select == ADD) {
         locMemHwdAddCoopKernel<ADD><<< num_blocks, BLOCK, shmem_size >>>
@@ -90,6 +100,8 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
             (N, H, histos_per_block, NUM_THREADS(N), d_input, d_histos);
       }
     }
+    cudaThreadSynchronize();
+    gpuAssert( cudaPeekAtLastError() );
 
     cudaMemset(d_histos, 0, mem_size_histos);
     cudaMemset(d_histo , 0, mem_size_histo );
@@ -102,7 +114,6 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
     gettimeofday(&t_start, NULL); 
 
     for(int q=0; q<num_gpu_runs; q++) {
-      //cudaMemset(d_histos, 0, mem_size_histos);
       if(select == ADD) {
         locMemHwdAddCoopKernel<ADD><<< num_blocks, BLOCK, shmem_size >>>
             (N, H, histos_per_block, NUM_THREADS(N), d_input, d_histos);
@@ -119,6 +130,7 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
     gettimeofday(&t_end, NULL);
     timeval_subtract(&t_diff, &t_end, &t_start);
     elapsed = (t_diff.tv_sec*1e6+t_diff.tv_usec);
+    gpuAssert( cudaPeekAtLastError() );
 
     { // reduce across histograms and copy to host
         const size_t num_blocks_red = (H + BLOCK - 1) / BLOCK;
@@ -144,10 +156,105 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
     return (elapsed/num_gpu_runs);
 }
 
-/*********************************************/
-/*** Various Helpers, for example printing ***/
-/*********************************************/
+/********************************/
+/*** Global-Memory Histograms ***/
+/********************************/
+unsigned long
+glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const float k, const int B, int* d_input, int* h_ref_histo) {
+    const int T = NUM_THREADS(N);
+    const int C = min( T, (int) ceil(H / k) );
+    const int M = (T+C-1) / C;
 
+    if((C <= 0) || (C > T)) {
+        printf("Illegal subhistogram degree k: %f, resulting in C:%d for H:%d, XCG?=%d, EXITING!\n", k, C, H, (select==XCHG));
+        exit(0);
+    }
+
+    // setup execution parameters
+    const size_t num_blocks = (T + B - 1) / B;
+    const size_t mem_size_histo  = H * sizeof(int);
+    const size_t mem_size_histos = M * mem_size_histo;
+    const size_t mem_size_locks  = mem_size_histos;
+    int* d_histos;
+    int* d_histo;
+    int* d_locks;
+    int* h_histo = (int*)malloc(H*sizeof(int));
+
+    cudaMalloc((void**) &d_histos, mem_size_histos);
+    cudaMalloc((void**) &d_histo,  mem_size_histo );
+    cudaMalloc((void**) &d_locks,  mem_size_histos);
+    cudaMemset(d_locks,  0, mem_size_locks );
+    cudaMemset(d_histo,  0, mem_size_histo );
+    cudaMemset(d_histos, 0, mem_size_histos);
+
+    { // dry run
+      if(select == ADD) {
+        glbMemHwdAddCoopKernel<ADD><<< num_blocks, B >>>
+            (N, H, C, T, d_input, d_histos, NULL);
+      } else if (select == CAS){
+        glbMemHwdAddCoopKernel<CAS><<< num_blocks, B >>>
+            (N, H, C, T, d_input, d_histos, NULL);
+      } else { // select == XCHG
+        glbMemHwdAddCoopKernel<XCHG><<< num_blocks, B >>>
+            (N, H, C, T, d_input, d_histos, d_locks);
+      }
+    }
+    cudaThreadSynchronize();
+    gpuAssert( cudaPeekAtLastError() );
+
+    const int num_gpu_runs = GPU_RUNS;
+
+    unsigned long int elapsed;
+    struct timeval t_start, t_end, t_diff;
+    gettimeofday(&t_start, NULL); 
+
+    for(int q=0; q<num_gpu_runs; q++) {
+      cudaMemset(d_histos, 0, mem_size_histos);
+      if(select == ADD) {
+        glbMemHwdAddCoopKernel<ADD><<< num_blocks, B >>>
+            (N, H, C, T, d_input, d_histos, NULL);
+      } else if (select == CAS){
+        glbMemHwdAddCoopKernel<CAS><<< num_blocks, B >>>
+            (N, H, C, T, d_input, d_histos, NULL);
+      } else { // select == XCHG
+        glbMemHwdAddCoopKernel<XCHG><<< num_blocks, B >>>
+            (N, H, C, T, d_input, d_histos, d_locks);
+      }
+    }
+    cudaThreadSynchronize();
+
+    gettimeofday(&t_end, NULL);
+    timeval_subtract(&t_diff, &t_end, &t_start);
+    elapsed = (t_diff.tv_sec*1e6+t_diff.tv_usec);
+    gpuAssert( cudaPeekAtLastError() );
+
+    { // reduce across histograms and copy to host
+        const size_t num_blocks_red = (H + B - 1) / B;
+        naive_reduce_kernel<<< num_blocks_red, BLOCK >>>(d_histos, d_histo, H, M);
+        cudaMemcpy(h_histo, d_histo, mem_size_histo, cudaMemcpyDeviceToHost);
+    }
+
+    { // validate and free memory
+        bool is_valid = validate<int>(h_histo, h_ref_histo, H);
+
+        free(h_histo);
+        cudaFree(d_histos);
+        cudaFree(d_histo);
+        cudaFree(d_locks);
+
+        if(!is_valid) {
+            printf( "glbMemHwdAddCoop: Validation FAILS! B:%d, T:%d, N:%d, H:%d, k:%f, M:%d, coop:%d, XCHG:%d, Exiting!\n\n"
+                  , B, T, N, H, k, M, C, (int)(select==XCHG) );
+            exit(1);
+        }
+    }
+
+    return (elapsed/num_gpu_runs);
+}
+
+/***********************/
+/*** Pretty printing ***/
+/***********************/
 void printTextTab(const unsigned long runtimes[3][5][5], const int histo_sizes[5], const int R) {
     const int num_histos = 5;
     const int num_m_degs = 5;
@@ -159,7 +266,7 @@ void printTextTab(const unsigned long runtimes[3][5][5], const int histo_sizes[5
         for(int i = 0; i<num_histos; i++) { printf("H=%d\t", histo_sizes[i]); }
         printf("\n");
         for(int j=0; j<num_m_degs; j++) {
-            if      (j==0) printf("C = B\t");
+            if      (j==0) printf("C = B    \t");
             else if (j==1) printf("C = H / 1\t");
             else if (j==2) printf("C = H / 3\t");
             else if (j==3) printf("C = H / 6\t");
@@ -173,17 +280,6 @@ void printTextTab(const unsigned long runtimes[3][5][5], const int histo_sizes[5
         printf("\n");
     }
 }
-
-/**
-  \begin{tabular}{|l|l|l|l|l|l|}\hline
-        CAS, RF=30 &     H=25   & H=57   & H=121 &  H=249 &  H=505\\\hline
-        C = B      &     815354 & 822372 & 72282 &  24621 &  9333\\
-        C = H / 1  &     1175   & 4448   & 2986  &  3243  &  3559\\
-        C = H / 3  &     508    & 954    & 928   &  1071  &  1149\\
-        C = H / 6  &     474    & 522    & 628   &  692   &  711\\
-        C = H / 12 &     464    & 472    & 524   &  553   &  572\\\hline
-  \end{tabular}
- */
 void printLaTex(const unsigned long runtimes[3][5][5], const int histo_sizes[5], const int R) {
     const int num_histos = 5;
     const int num_m_degs = 5;
@@ -196,7 +292,7 @@ void printLaTex(const unsigned long runtimes[3][5][5], const int histo_sizes[5],
         for(int i = 0; i<num_histos; i++) { printf("\t& H=%d", histo_sizes[i]); }
         printf("\\\\\\hline\n");
         for(int j=0; j<num_m_degs; j++) {
-            if      (j==0) printf("C = B");
+            if      (j==0) printf("C = B    ");
             else if (j==1) printf("C = H / 1");
             else if (j==2) printf("C = H / 3");
             else if (j==3) printf("C = H / 6");
@@ -212,5 +308,4 @@ void printLaTex(const unsigned long runtimes[3][5][5], const int histo_sizes[5],
         printf("\\end{tabular}\n");
     }
 }
-
 #endif // HISTO_WRAPPER

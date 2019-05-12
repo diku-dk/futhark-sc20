@@ -1,7 +1,10 @@
 #ifndef HISTO_KERNELS
 #define HISTO_KERNELS
 
+#define STRIDED_MODE 1
+
 enum AtomicPrim {ADD, CAS, XCHG};
+enum MemoryType {GLBMEM, LOCMEM};
 
 template<class T>
 struct indval {
@@ -15,7 +18,7 @@ struct indval<T>
 f(T pixel, int his_sz) {
   const int ratio = max(1, his_sz/RACE_FACT);
   struct indval<T> iv;
-  iv.index = ((int)pixel) % ratio;
+  iv.index = (((int)pixel) % ratio) * RACE_FACT;
   iv.value = pixel;
   return iv;
 }
@@ -48,43 +51,69 @@ atomCAS(volatile int* loc_hists, volatile int* locks, int idx, int v) {
     } while(assumed != old);
 }
 __device__ inline static void
-atomXCG(volatile int* loc_hists, volatile int* loc_locks, int idx, int v) {
+atomXCGloc(volatile int* loc_hists, volatile int* loc_locks, int idx, int v) {
     bool done = false;
-    do {
+    while(!done) {
         if( atomicExch((int *)&loc_locks[idx], 1) == 0 ) {
             loc_hists[idx] += v;
             atomicExch((int *)&loc_locks[idx], 0);
             done = true;
         }
-    } while (!done);
+        __threadfence();
+    }
+}
+__device__ inline static void
+atomXCGglb(volatile int* loc_hists, volatile int* loc_locks, int idx, int v) {
+    bool done = false;
+    while(!done) {
+        if( atomicExch((int *)&loc_locks[idx], 1) == 0 ) {
+            loc_hists[idx] += v;
+            __threadfence();
+            loc_locks[idx] = 0;
+            done = true;
+        }
+        __threadfence();
+    }
 }
 // compile-time selector of atomic-update primitive
-template<AtomicPrim primKind> __device__ inline void
-atomicAddPrim(volatile int* loc_hists, volatile int* locks, int idx, int v) {
-    if      (primKind == ADD)  atomADD(loc_hists, NULL,  idx, v);
-    else if (primKind == CAS)  atomCAS(loc_hists, NULL,  idx, v);
-    else/*(primKind == XCHG)*/ atomXCG(loc_hists, locks, idx, v);
+template<AtomicPrim primKind, MemoryType memKind> __device__ inline void
+selectAtomicAdd(volatile int* loc_hists, volatile int* locks, int idx, int v) {
+    if      (primKind == ADD)    atomADD(loc_hists, NULL,  idx, v);
+    else if (primKind == CAS)    atomCAS(loc_hists, NULL,  idx, v);
+    else if (memKind  == LOCMEM) atomXCGloc(loc_hists, locks, idx, v); // primKind == XCHG
+    else                         atomXCGglb(loc_hists, locks, idx, v); // memKind  == GLBMEM                      
 }
 
-/**********************************************/
-
+/**************************************************/
+/***  Local-Memory Histogram Computation Kernel ***/
+/**************************************************/
+/**
+ * Nomenclature:
+ * N size of input array
+ * H size of one histogram
+ * M degree of sub-histogramming per block/workgroup
+ *   (one workgroup computes M histograms)
+ * C is the cooperation level ceil(BLOCK/M)
+ * T the number of used hardware threads, i.e., T = min(N, Thwd_max)
+ * histos: the global-memory array to store the subhistogram result. 
+ */
 template<AtomicPrim primKind>
 __global__ void
 locMemHwdAddCoopKernel( const int N, const int H,
-                        const int hists_per_block, const int num_threads,
-                        int* d_input, int* d_histos
+                        const int M, const int T,
+                        int* input, int* histos
 ) {
     extern __shared__ volatile int loc_hists[];
     const unsigned int tid = threadIdx.x;
     const unsigned int gid = blockIdx.x * blockDim.x + tid;
-    int his_block_sz = hists_per_block * H;
-    int ghid = blockIdx.x * hists_per_block * H;
+    int his_block_sz = M * H;
+    int ghid = blockIdx.x * M * H;
 
-#ifdef SLOW_MODE
-    int coop = (blockDim.x + hists_per_block - 1) / hists_per_block;
-    int lhid = (tid / coop) * H;
+#if STRIDED_MODE
+    int lhid = (tid % M) * H;
 #else
-    int lhid = (tid % hists_per_block) * H;
+    int C = (blockDim.x + M - 1) / M;
+    int lhid = (tid / C) * H;    
 #endif
     
     { // initialize local histograms (and locks if in case XCHG)
@@ -98,19 +127,44 @@ locMemHwdAddCoopKernel( const int N, const int H,
     }
 
     // compute local histograms
-    //if(gid < num_threads) 
+    //if(gid < T) 
     {
-        for(int i=gid; i<N; i+=num_threads) {
-            struct indval<int> iv = f<int>(d_input[i], H);
-            atomicAddPrim<primKind>(loc_hists, loc_hists+his_block_sz, lhid + iv.index, iv.value);
+        for(int i=gid; i<N; i+=T) {
+            struct indval<int> iv = f<int>(input[i], H);
+            selectAtomicAdd<primKind, LOCMEM>( loc_hists, loc_hists+his_block_sz
+                                             , lhid+iv.index, iv.value );
         }
     }
     __syncthreads();
 
     // copy local histograms to global memory
     for(int i=tid; i<his_block_sz; i+=blockDim.x) {
-        d_histos[ghid + i] = loc_hists[i];
+        histos[ghid + i] = loc_hists[i];
     }
 }
 
+/**************************************************/
+/*** Global-Memory Histogram Computation Kernel ***/
+/**************************************************/
+template<AtomicPrim primKind>
+__global__ void
+glbMemHwdAddCoopKernel( const int N, const int H,
+                        const int C, const int T,
+                        int* input,
+                        volatile int* histos,
+                        volatile int* locks
+) {
+    const unsigned int gid = blockIdx.x * blockDim.x + threadIdx.x;
+#if STRIDED_MODE
+    int M = (T+C-1) / C;
+    int ghidx = (gid % M) * H;
+#else
+    int ghidx = (gid / C) * H;
+#endif
+    // compute histograms; assumes histograms have been previously initialized
+    for(int i=gid; i<N; i+=T) {
+        struct indval<int> iv = f<int>(input[i], H);
+        selectAtomicAdd<primKind, GLBMEM>(histos, locks, ghidx+iv.index, iv.value);
+    }
+}
 #endif // HISTO_KERNELS
