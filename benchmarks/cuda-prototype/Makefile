@@ -1,11 +1,17 @@
-COMPILER?=nvcc
+0;95;0cCOMPILER?=nvcc
 OPT_FLAGS?=-O3
 LDFLAGS?=-lOpenCL
 
 PROGRAM=genhisto
 
-all: histo-main.cu histo-wrap.cu.h histo-kernels.cu.h
+.PHONY: clean all run
+
+$(PROGRAM): histo-main.cu histo-wrap.cu.h histo-kernels.cu.h
 	$(COMPILER) $(OPT_FLAGS) -o $(PROGRAM) histo-main.cu
+
+all: $(PROGRAM)
+
+run: $(PROGRAM)
 	./$(PROGRAM)
 
 race-1: histo-main.cu histo-wrap.cu.h histo-kernels.cu.h
@@ -19,8 +25,6 @@ race-10: histo-main.cu histo-wrap.cu.h histo-kernels.cu.h
 race-30: histo-main.cu histo-wrap.cu.h histo-kernels.cu.h
 	$(COMPILER) $(OPT_FLAGS) -D RACE_FACT=30 -o $(PROGRAM) histo-main.cu
 	./$(PROGRAM)
-
-.PHONY: clean
 
 clean:
 	rm -f $(PROGRAM) *.o
