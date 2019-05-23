@@ -8,6 +8,10 @@
 #define MIN(a,b)    (((a) < (b)) ? a : b)
 #define MAX(a,b)    (((a) < (b)) ? b : a) 
 
+#ifndef RACE_FACT
+#define RACE_FACT   32
+#endif
+
 #define CTGRACE     0
 #define L2Cache     (1024*1024)
 #define L2Fract     0.4
@@ -29,10 +33,6 @@
  
 #ifndef DEBUG_INFO
 #define DEBUG_INFO  1
-#endif
-
-#ifndef RACE_FACT
-#define RACE_FACT   32
 #endif
 
 #ifndef LOCMEMW_PERTHD
