@@ -25,7 +25,7 @@
 #define CPU_RUNS    1
 
 #define INP_LEN     50000000
-#define Hmax        500000
+#define Hmax        1000000
  
 #ifndef DEBUG_INFO
 #define DEBUG_INFO  1
@@ -155,6 +155,9 @@ void runGlobalMemDataset(int* h_input, int* h_histo, int* d_input) {
             runtimes[2][i][j] = glbMemHwdAddCoop(XCHG, INP_LEN, H, (M+1)/2, B, d_input, h_histo);
         }
     }
+
+    printf("Running Histo in Global Mem: RACE_FACT: %d, CTGRACE: %d, RACE_EXPNS: %f, L2Cache:%d, L2Fract: %f\n",
+           RACE_FACT, CTGRACE, RACE_EXPNS, L2Cache, L2Fract);
 
     printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RACE_FACT);
     //printLaTex  (runtimes, histo_sizes, subhisto_degs, RACE_FACT);

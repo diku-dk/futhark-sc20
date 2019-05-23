@@ -1,4 +1,4 @@
-0;95;0cCOMPILER?=nvcc
+COMPILER?=nvcc
 OPT_FLAGS?=-O3
 LDFLAGS?=-lOpenCL
 
