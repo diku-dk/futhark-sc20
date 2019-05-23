@@ -160,13 +160,17 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
 /*** Global-Memory Histograms ***/
 /********************************/
 unsigned long
-glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const float k, const int B, int* d_input, int* h_ref_histo) {
+glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int M, const int B, int* d_input, int* h_ref_histo) {
     const int T = NUM_THREADS(N);
+    const int C = (T + M - 1) / M;
+
+#if 0
     const int C = min( T, (int) ceil(H / k) );
     const int M = (T+C-1) / C;
+#endif
 
     if((C <= 0) || (C > T)) {
-        printf("Illegal subhistogram degree k: %f, resulting in C:%d for H:%d, XCG?=%d, EXITING!\n", k, C, H, (select==XCHG));
+        printf("Illegal subhistogram degree M: %d, resulting in C:%d for H:%d, XCG?=%d, EXITING!\n", M, C, H, (select==XCHG));
         exit(0);
     }
 
@@ -190,13 +194,13 @@ glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const float k, con
     { // dry run
       if(select == ADD) {
         glbMemHwdAddCoopKernel<ADD><<< num_blocks, B >>>
-            (N, H, C, T, d_input, d_histos, NULL);
+            (N, H, M, T, d_input, d_histos, NULL);
       } else if (select == CAS){
         glbMemHwdAddCoopKernel<CAS><<< num_blocks, B >>>
-            (N, H, C, T, d_input, d_histos, NULL);
+            (N, H, M, T, d_input, d_histos, NULL);
       } else { // select == XCHG
         glbMemHwdAddCoopKernel<XCHG><<< num_blocks, B >>>
-            (N, H, C, T, d_input, d_histos, d_locks);
+            (N, H, M, T, d_input, d_histos, d_locks);
       }
     }
     cudaThreadSynchronize();
@@ -212,14 +216,16 @@ glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const float k, con
       cudaMemset(d_histos, 0, mem_size_histos);
       if(select == ADD) {
         glbMemHwdAddCoopKernel<ADD><<< num_blocks, B >>>
-            (N, H, C, T, d_input, d_histos, NULL);
+            (N, H, M, T, d_input, d_histos, NULL);
       } else if (select == CAS){
         glbMemHwdAddCoopKernel<CAS><<< num_blocks, B >>>
-            (N, H, C, T, d_input, d_histos, NULL);
+            (N, H, M, T, d_input, d_histos, NULL);
       } else { // select == XCHG
         glbMemHwdAddCoopKernel<XCHG><<< num_blocks, B >>>
-            (N, H, C, T, d_input, d_histos, d_locks);
+            (N, H, M, T, d_input, d_histos, d_locks);
       }
+      // reduce across subhistograms
+      naive_reduce_kernel<<< (H+B-1) / B, BLOCK >>>(d_histos, d_histo, H, M);
     }
     cudaThreadSynchronize();
 
@@ -229,8 +235,8 @@ glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const float k, con
     gpuAssert( cudaPeekAtLastError() );
 
     { // reduce across histograms and copy to host
-        const size_t num_blocks_red = (H + B - 1) / B;
-        naive_reduce_kernel<<< num_blocks_red, BLOCK >>>(d_histos, d_histo, H, M);
+        //const size_t num_blocks_red = (H + B - 1) / B;
+        //naive_reduce_kernel<<< num_blocks_red, BLOCK >>>(d_histos, d_histo, H, M);
         cudaMemcpy(h_histo, d_histo, mem_size_histo, cudaMemcpyDeviceToHost);
     }
 
@@ -243,8 +249,8 @@ glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const float k, con
         cudaFree(d_locks);
 
         if(!is_valid) {
-            printf( "glbMemHwdAddCoop: Validation FAILS! B:%d, T:%d, N:%d, H:%d, k:%f, M:%d, coop:%d, XCHG:%d, Exiting!\n\n"
-                  , B, T, N, H, k, M, C, (int)(select==XCHG) );
+            printf( "glbMemHwdAddCoop: Validation FAILS! B:%d, T:%d, N:%d, H:%d, M:%d, coop:%d, XCHG:%d, Exiting!\n\n"
+                  , B, T, N, H, M, C, (int)(select==XCHG) );
             exit(1);
         }
     }
@@ -255,9 +261,12 @@ glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const float k, con
 /***********************/
 /*** Pretty printing ***/
 /***********************/
-void printTextTab(const unsigned long runtimes[3][5][5], const int histo_sizes[5], const int R) {
-    const int num_histos = 5;
-    const int num_m_degs = 5;
+template<int num_histos, int num_m_degs>
+void printTextTab( const unsigned long runtimes[3][num_histos][num_m_degs]
+                 , const int histo_sizes[num_histos]
+                 , const int kms[num_m_degs]
+                 , const int R
+) {
     for(int k=0; k<3; k++) {
         if     (k==0) printf("ADD, R=%d\t", R);
         else if(k==1) printf("CAS, R=%d\t", R);
@@ -266,12 +275,9 @@ void printTextTab(const unsigned long runtimes[3][5][5], const int histo_sizes[5
         for(int i = 0; i<num_histos; i++) { printf("H=%d\t", histo_sizes[i]); }
         printf("\n");
         for(int j=0; j<num_m_degs; j++) {
-            if      (j==0) printf("C = B    \t");
-            else if (j==1) printf("C = H / 1\t");
-            else if (j==2) printf("C = H / 3\t");
-            else if (j==3) printf("C = H / 6\t");
-            else if (j==4) printf("C = H /12\t");
-
+            if      (j==0)             printf("M=1 \t");
+            else if (j < num_m_degs-1) printf("M=%d\t", kms[j]);
+            else                       printf("Ours\t");
             for(int i = 0; i<num_histos; i++) {
                 printf("%lu\t", runtimes[k][i][j]);
             }
@@ -280,9 +286,11 @@ void printTextTab(const unsigned long runtimes[3][5][5], const int histo_sizes[5
         printf("\n");
     }
 }
-void printLaTex(const unsigned long runtimes[3][5][5], const int histo_sizes[5], const int R) {
-    const int num_histos = 5;
-    const int num_m_degs = 5;
+template<int num_histos, int num_m_degs>
+void printLaTex( const unsigned long runtimes[3][num_histos][num_m_degs]
+               , const int histo_sizes[num_histos]
+               , const int kms[num_m_degs]
+               , const int R) {
     for(int k=0; k<3; k++) {
         printf("\\begin{tabular}{|l|l|l|l|l|l|}\\hline\n");
         if     (k==0) printf("ADD, R=%d", R);
@@ -292,11 +300,9 @@ void printLaTex(const unsigned long runtimes[3][5][5], const int histo_sizes[5],
         for(int i = 0; i<num_histos; i++) { printf("\t& H=%d", histo_sizes[i]); }
         printf("\\\\\\hline\n");
         for(int j=0; j<num_m_degs; j++) {
-            if      (j==0) printf("C = B    ");
-            else if (j==1) printf("C = H / 1");
-            else if (j==2) printf("C = H / 3");
-            else if (j==3) printf("C = H / 6");
-            else if (j==4) printf("C = H /12");
+            if      (j==0)             printf("M=1 ");
+            else if (j < num_m_degs-1) printf("M=%d", kms[j]);
+            else                       printf("Ours");
             
             for(int i = 0; i<num_histos; i++) {
                 printf("\t& %lu", runtimes[k][i][j]);

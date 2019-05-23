@@ -1,7 +1,7 @@
 #ifndef HISTO_KERNELS
 #define HISTO_KERNELS
 
-#define STRIDED_MODE 1
+#define STRIDED_MODE 0
 
 enum AtomicPrim {ADD, CAS, XCHG};
 enum MemoryType {GLBMEM, LOCMEM};
@@ -18,7 +18,12 @@ struct indval<T>
 f(T pixel, int his_sz) {
   const int ratio = max(1, his_sz/RACE_FACT);
   struct indval<T> iv;
-  iv.index = (((int)pixel) % ratio) * RACE_FACT;
+  const int contraction = (((int)pixel) % ratio);
+#if CTGRACE
+  iv.index = contraction;
+#else
+  iv.index = contraction * RACE_FACT;
+#endif
   iv.value = pixel;
   return iv;
 }
@@ -149,16 +154,16 @@ locMemHwdAddCoopKernel( const int N, const int H,
 template<AtomicPrim primKind>
 __global__ void
 glbMemHwdAddCoopKernel( const int N, const int H,
-                        const int C, const int T,
+                        const int M, const int T,
                         int* input,
                         volatile int* histos,
                         volatile int* locks
 ) {
     const unsigned int gid = blockIdx.x * blockDim.x + threadIdx.x;
 #if STRIDED_MODE
-    int M = (T+C-1) / C;
     int ghidx = (gid % M) * H;
 #else
+    int C = (T + M - 1) / M;
     int ghidx = (gid / C) * H;
 #endif
     // compute histograms; assumes histograms have been previously initialized
