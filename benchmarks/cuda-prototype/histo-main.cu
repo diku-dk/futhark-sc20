@@ -8,24 +8,36 @@
 #define MIN(a,b)    (((a) < (b)) ? a : b)
 #define MAX(a,b)    (((a) < (b)) ? b : a) 
 
+
+#define GLB_K_MIN   2
+
 #ifndef RACE_FACT
-#define RACE_FACT   32
+#define RACE_FACT   32  // = H / (Num_Distinct_Pts)
 #endif
 
-#define CTGRACE     0
+#ifndef STRIDE
+#define STRIDE      32   // = (Max_Ind_Pt - Min_Ind_Pt) / Num_Distinct_Pts
+#endif
+
+#define CLelmsz     16 // how many elements fit on a L2 cache line
+
 #define L2Cache     (1024*1024)
 #define L2Fract     0.4
 
-#define SHRINK_FACT (0.5*RACE_FACT) //0.625
-
-#if CTGRACE
-    #define RACE_EXPNS  MAX(1.0, SHRINK_FACT)
+#if 1
+  #define RACE_EXPNS MAX(1.0, 0.5 * (((float)RACE_FACT)/CLelmsz) * ( (CLelmsz>STRIDE) ? (CLelmsz/STRIDE) : 1 ) )
 #else
+  #define CTGRACE     1
+  #define SHRINK_FACT (0.5*RACE_FACT) //0.625
+  #if CTGRACE
+    #define RACE_EXPNS  MAX(1.0, SHRINK_FACT)
+  #else
     #define RACE_EXPNS  MAX(1.0, SHRINK_FACT / 16)
+  #endif
 #endif
 
 #define BLOCK       1024
-#define GPU_RUNS    50
+#define GPU_RUNS    10
 #define CPU_RUNS    1
 
 #define INP_LEN     50000000
@@ -65,15 +77,36 @@ int autoLocSubHistoDeg(const AtomicPrim prim_kind, const int Q, const int H, con
     return min(m, BLOCK);
 }
 
-int autoGlbSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, const int T, const int L2) {
+int autoGlbSubHistoDeg(
+                const AtomicPrim prim_kind, const int H, const int N, const int T, const int L2
+) {
     const int el_size = (prim_kind == XCHG)? 2*sizeof(int) : sizeof(int);
     const float frac  = L2Fract * RACE_EXPNS;
     const float k_max = MIN( frac * (L2 / el_size) / T, ((float)N)/T );
     const float coop  = MIN( (float)T, H/k_max );
-    const int   M     = (int) (T / coop);
-    return max(1, M);
+    return max(1, (int) (T / coop));
 }
 
+void autoGlbChunksSubhists(
+                const AtomicPrim prim_kind, const int H, const int N, const int T, const int L2,
+                int* M, int* num_chunks ) {
+    const int el_size = (prim_kind == XCHG)?
+                        2*sizeof(int) : sizeof(int);
+    
+    const float  optim_k_min = GLB_K_MIN;
+    const float  coop  = MIN( (float)T, H/optim_k_min );
+    const int    Mdeg  = max(1, (int) (T / coop));
+    const size_t totsz = Mdeg * H;
+    const size_t L2csz = L2Fract * (L2 / el_size) * RACE_EXPNS;
+    const int num_chks = (totsz + L2csz - 1) / L2csz;
+    const int Hnew     = (H + num_chks - 1) / num_chks;
+
+    *num_chunks = num_chks;
+    *M = autoGlbSubHistoDeg(prim_kind, Hnew, N, T, L2);
+
+    printf( "CHUNKING branch: optim_k_min: %f, coop: %f, Mdeg: %d, Hold: %d, Hnew: %d, num_chunks: %d, M: %d\n"
+          , optim_k_min, coop, Mdeg, H, Hnew, *num_chunks, *M );
+}
 
 void testLocMemAlignmentProblem(const int H, int* h_input, int* h_histo, int* d_input) {
         
@@ -129,11 +162,11 @@ void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
 
 void runGlobalMemDataset(int* h_input, int* h_histo, int* d_input) {
     const int T = NUM_THREADS(INP_LEN);
-    const int num_histos = 6;
+    const int num_histos = 7;
     const int num_m_degs = 6;
     const int algn = 1;
     const int histo_sizes[num_histos] = { 1*12*1024-algn,  2*12*1024-algn,  4*12*1024-algn
-                                        , 8*12*1024-algn, 16*12*1024-algn, 32*12*1024-algn };
+                                        , 8*12*1024-algn, 16*12*1024-algn, 32*12*1024-algn, 64*12*1024-algn };
     const int subhisto_degs[num_m_degs] = { 1, 2, 4, 6, 8, 33 };    
     unsigned long runtimes[3][num_histos][num_m_degs];
 
@@ -143,21 +176,29 @@ void runGlobalMemDataset(int* h_input, int* h_histo, int* d_input) {
         goldSeqHisto(INP_LEN, H, h_input, h_histo);
 
         for(int j=0; j<num_m_degs; j++) {
-            const int M = (j != (num_m_degs-1)) ? subhisto_degs[j] :
-                          autoGlbSubHistoDeg(ADD, H, INP_LEN, T, L2Cache);
+            int M,    num_chunks;
+            int M_lk, num_chunks_lk;
+
+            if(j == num_m_degs-1) {
+                autoGlbChunksSubhists(ADD,  H, INP_LEN, T, L2Cache, &M,    &num_chunks);
+                autoGlbChunksSubhists(XCHG, H, INP_LEN, T, L2Cache, &M_lk, &num_chunks_lk);
+            } else {
+                num_chunks = 1; M = subhisto_degs[j];
+                num_chunks_lk = 1; M_lk = (M+1)/2;
+            }
 
             if(j==(num_m_degs-1))
-                printf("Our M: %d for H: %d\n", M, H);
+                printf("Our M: %d, num_chunks: %d, for H: %d\n", M, num_chunks, H);
 
             const int B = 256;
-            runtimes[0][i][j] = glbMemHwdAddCoop(ADD,  INP_LEN, H, M,   B, d_input, h_histo);
-            runtimes[1][i][j] = glbMemHwdAddCoop(CAS,  INP_LEN, H, M,   B, d_input, h_histo);
-            runtimes[2][i][j] = glbMemHwdAddCoop(XCHG, INP_LEN, H, (M+1)/2, B, d_input, h_histo);
+            runtimes[0][i][j] = glbMemHwdAddCoop(ADD,  INP_LEN, H, B, M,    num_chunks,    d_input, h_histo);
+            runtimes[1][i][j] = glbMemHwdAddCoop(CAS,  INP_LEN, H, B, M,    num_chunks,    d_input, h_histo);
+            runtimes[2][i][j] = glbMemHwdAddCoop(XCHG, INP_LEN, H, B, M_lk, num_chunks_lk, d_input, h_histo);
         }
     }
 
-    printf("Running Histo in Global Mem: RACE_FACT: %d, CTGRACE: %d, RACE_EXPNS: %f, L2Cache:%d, L2Fract: %f\n",
-           RACE_FACT, CTGRACE, RACE_EXPNS, L2Cache, L2Fract);
+    printf("Running Histo in Global Mem: RACE_FACT: %d, STRIDE: %d, RACE_EXPNS: %f, L2Cache:%d, L2Fract: %f\n",
+           RACE_FACT, STRIDE, RACE_EXPNS, L2Cache, L2Fract);
 
     printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RACE_FACT);
     //printLaTex  (runtimes, histo_sizes, subhisto_degs, RACE_FACT);

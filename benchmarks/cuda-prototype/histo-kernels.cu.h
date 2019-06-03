@@ -19,7 +19,7 @@ f(T pixel, int his_sz) {
   const int ratio = max(1, his_sz/RACE_FACT);
   struct indval<T> iv;
   const int contraction = (((int)pixel) % ratio);
-#if CTGRACE
+#if (CTGRACE || (STRIDE==1))
   iv.index = contraction;
 #else
   iv.index = contraction * RACE_FACT;
@@ -155,6 +155,7 @@ template<AtomicPrim primKind>
 __global__ void
 glbMemHwdAddCoopKernel( const int N, const int H,
                         const int M, const int T,
+                        const int chunk_beg, const int chunk_end,
                         int* input,
                         volatile int* histos,
                         volatile int* locks
@@ -169,7 +170,8 @@ glbMemHwdAddCoopKernel( const int N, const int H,
     // compute histograms; assumes histograms have been previously initialized
     for(int i=gid; i<N; i+=T) {
         struct indval<int> iv = f<int>(input[i], H);
-        selectAtomicAdd<primKind, GLBMEM>(histos, locks, ghidx+iv.index, iv.value);
+        if (iv.index >= chunk_beg && iv.index < chunk_end)
+            selectAtomicAdd<primKind, GLBMEM>(histos, locks, ghidx+iv.index, iv.value);
     }
 }
 #endif // HISTO_KERNELS

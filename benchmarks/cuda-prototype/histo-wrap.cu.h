@@ -160,9 +160,10 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
 /*** Global-Memory Histograms ***/
 /********************************/
 unsigned long
-glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int M, const int B, int* d_input, int* h_ref_histo) {
+glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int B, const int M, const int num_chunks, int* d_input, int* h_ref_histo) {
     const int T = NUM_THREADS(N);
     const int C = (T + M - 1) / M;
+    const int chunk_size = (H + num_chunks - 1) / num_chunks;
 
 #if 0
     const int C = min( T, (int) ceil(H / k) );
@@ -173,7 +174,7 @@ glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int M, const
         printf("Illegal subhistogram degree M: %d, resulting in C:%d for H:%d, XCG?=%d, EXITING!\n", M, C, H, (select==XCHG));
         exit(0);
     }
-
+    
     // setup execution parameters
     const size_t num_blocks = (T + B - 1) / B;
     const size_t mem_size_histo  = H * sizeof(int);
@@ -192,15 +193,17 @@ glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int M, const
     cudaMemset(d_histos, 0, mem_size_histos);
 
     { // dry run
-      if(select == ADD) {
-        glbMemHwdAddCoopKernel<ADD><<< num_blocks, B >>>
-            (N, H, M, T, d_input, d_histos, NULL);
-      } else if (select == CAS){
-        glbMemHwdAddCoopKernel<CAS><<< num_blocks, B >>>
-            (N, H, M, T, d_input, d_histos, NULL);
-      } else { // select == XCHG
-        glbMemHwdAddCoopKernel<XCHG><<< num_blocks, B >>>
-            (N, H, M, T, d_input, d_histos, d_locks);
+      for(int k=0; k<num_chunks; k++) {
+        if(select == ADD) {
+          glbMemHwdAddCoopKernel<ADD><<< num_blocks, B >>>
+              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
+        } else if (select == CAS){
+          glbMemHwdAddCoopKernel<CAS><<< num_blocks, B >>>
+              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
+        } else { // select == XCHG
+          glbMemHwdAddCoopKernel<XCHG><<< num_blocks, B >>>
+              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, d_locks);
+        }
       }
     }
     cudaThreadSynchronize();
@@ -214,15 +217,17 @@ glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int M, const
 
     for(int q=0; q<num_gpu_runs; q++) {
       cudaMemset(d_histos, 0, mem_size_histos);
-      if(select == ADD) {
-        glbMemHwdAddCoopKernel<ADD><<< num_blocks, B >>>
-            (N, H, M, T, d_input, d_histos, NULL);
-      } else if (select == CAS){
-        glbMemHwdAddCoopKernel<CAS><<< num_blocks, B >>>
-            (N, H, M, T, d_input, d_histos, NULL);
-      } else { // select == XCHG
-        glbMemHwdAddCoopKernel<XCHG><<< num_blocks, B >>>
-            (N, H, M, T, d_input, d_histos, d_locks);
+      for(int k=0; k<num_chunks; k++) {
+        if(select == ADD) {
+          glbMemHwdAddCoopKernel<ADD><<< num_blocks, B >>>
+              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
+        } else if (select == CAS){
+          glbMemHwdAddCoopKernel<CAS><<< num_blocks, B >>>
+              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
+        } else { // select == XCHG
+          glbMemHwdAddCoopKernel<XCHG><<< num_blocks, B >>>
+              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, d_locks);
+        }
       }
       // reduce across subhistograms
       naive_reduce_kernel<<< (H+B-1) / B, BLOCK >>>(d_histos, d_histo, H, M);
