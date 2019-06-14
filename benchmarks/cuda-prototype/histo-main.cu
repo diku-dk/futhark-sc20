@@ -12,23 +12,23 @@
 #define GLB_K_MIN   2
 
 #ifndef RACE_FACT
-#define RACE_FACT   32  // = H / (Num_Distinct_Pts)
+#define RACE_FACT   1 //32  // = H / (Num_Distinct_Pts)
 #endif
 
 #ifndef STRIDE
-#define STRIDE      32   // = (Max_Ind_Pt - Min_Ind_Pt) / Num_Distinct_Pts
+#define STRIDE      1   // = (Max_Ind_Pt - Min_Ind_Pt) / Num_Distinct_Pts
 #endif
 
 #define CLelmsz     16 // how many elements fit on a L2 cache line
 
-#define L2Cache     (1024*1024)
+#define L2Cache     (5632*1024) // 1024* for GTX1050Ti
 #define L2Fract     0.4
 
 #if 1
-  #define RACE_EXPNS MAX(1.0, 0.5 * (((float)RACE_FACT)/CLelmsz) * ( (CLelmsz>STRIDE) ? (CLelmsz/STRIDE) : 1 ) )
+  #define RACE_EXPNS MAX(1.0, 0.75 * (((float)RACE_FACT)/CLelmsz) * ( (CLelmsz>STRIDE) ? (CLelmsz/STRIDE) : 1 ) ) // 0.5* for GTX1050Ti
 #else
   #define CTGRACE     1
-  #define SHRINK_FACT (0.5*RACE_FACT) //0.625
+  #define SHRINK_FACT (0.75*RACE_FACT) //0.625
   #if CTGRACE
     #define RACE_EXPNS  MAX(1.0, SHRINK_FACT)
   #else
@@ -37,11 +37,11 @@
 #endif
 
 #define BLOCK       1024
-#define GPU_RUNS    10
+#define GPU_RUNS    50
 #define CPU_RUNS    1
 
 #define INP_LEN     50000000
-#define Hmax        1000000
+#define Hmax        2000000
  
 #ifndef DEBUG_INFO
 #define DEBUG_INFO  1
@@ -83,7 +83,8 @@ int autoGlbSubHistoDeg(
     const int el_size = (prim_kind == XCHG)? 2*sizeof(int) : sizeof(int);
     const float frac  = L2Fract * RACE_EXPNS;
     const float k_max = MIN( frac * (L2 / el_size) / T, ((float)N)/T );
-    const float coop  = MIN( (float)T, H/k_max );
+    const float coop_h = (prim_kind == ADD) ? (2.0*H) / k_max : (1.0*H) / k_max; 
+    const float coop  = MIN( (float)T, coop_h );
     return max(1, (int) (T / coop));
 }
 
@@ -130,9 +131,9 @@ void testLocMemAlignmentProblem(const int H, int* h_input, int* h_histo, int* d_
 
 
 void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
-    const int num_histos = 5;
+    const int num_histos = 8;
     const int num_m_degs = 5;
-    const int histo_sizes[num_histos] = { 25, 57, 121, 249, 505 }; //{ 64, 128, 256, 512 };
+    const int histo_sizes[num_histos] = { 25, 57, 121, 249, 505, 1024-7, 4096-7, 12288/2-1 }; //{ 64, 128, 256, 512 };
     //const AtomicPrim atomic_kinds[3] = {ADD, CAS, XCHG};
     const int ks[num_m_degs] = { 0, 1, 3, 6, 33 };
     unsigned long runtimes[3][num_histos][num_m_degs];
@@ -162,12 +163,12 @@ void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
 
 void runGlobalMemDataset(int* h_input, int* h_histo, int* d_input) {
     const int T = NUM_THREADS(INP_LEN);
-    const int num_histos = 7;
+    const int num_histos = 8;
     const int num_m_degs = 6;
     const int algn = 1;
     const int histo_sizes[num_histos] = { 1*12*1024-algn,  2*12*1024-algn,  4*12*1024-algn
-                                        , 8*12*1024-algn, 16*12*1024-algn, 32*12*1024-algn, 64*12*1024-algn };
-    const int subhisto_degs[num_m_degs] = { 1, 2, 4, 6, 8, 33 };    
+                                        , 8*12*1024-algn, 16*12*1024-algn, 32*12*1024-algn, 64*12*1024-algn, 128*12*1024-algn };
+    const int subhisto_degs[num_m_degs] = { 1, 4, 8, 16, 32, 33 };    
     unsigned long runtimes[3][num_histos][num_m_degs];
 
     for(int i=0; i<num_histos; i++) {
@@ -176,24 +177,27 @@ void runGlobalMemDataset(int* h_input, int* h_histo, int* d_input) {
         goldSeqHisto(INP_LEN, H, h_input, h_histo);
 
         for(int j=0; j<num_m_degs; j++) {
-            int M,    num_chunks;
-            int M_lk, num_chunks_lk;
+            int M_add, num_chunks_add;
+            int M_cas, num_chunks_cas;
+            int M_lck, num_chunks_lck;
 
             if(j == num_m_degs-1) {
-                autoGlbChunksSubhists(ADD,  H, INP_LEN, T, L2Cache, &M,    &num_chunks);
-                autoGlbChunksSubhists(XCHG, H, INP_LEN, T, L2Cache, &M_lk, &num_chunks_lk);
+                autoGlbChunksSubhists(ADD,  H, INP_LEN, T, L2Cache, &M_add, &num_chunks_add);
+                autoGlbChunksSubhists(CAS,  H, INP_LEN, T, L2Cache, &M_cas, &num_chunks_cas);
+                autoGlbChunksSubhists(XCHG, H, INP_LEN, T, L2Cache, &M_lck, &num_chunks_lck);
             } else {
-                num_chunks = 1; M = subhisto_degs[j];
-                num_chunks_lk = 1; M_lk = (M+1)/2;
+                num_chunks_add = 1; M_add = subhisto_degs[j];
+                num_chunks_cas = 1; M_cas = subhisto_degs[j];
+                num_chunks_lck = 1; M_lck = (M_cas+1)/2;
             }
 
             if(j==(num_m_degs-1))
-                printf("Our M: %d, num_chunks: %d, for H: %d\n", M, num_chunks, H);
+                printf("Our M_cas: %d, num_chunks_cas: %d, for H: %d\n", M_cas, num_chunks_cas, H);
 
             const int B = 256;
-            runtimes[0][i][j] = glbMemHwdAddCoop(ADD,  INP_LEN, H, B, M,    num_chunks,    d_input, h_histo);
-            runtimes[1][i][j] = glbMemHwdAddCoop(CAS,  INP_LEN, H, B, M,    num_chunks,    d_input, h_histo);
-            runtimes[2][i][j] = glbMemHwdAddCoop(XCHG, INP_LEN, H, B, M_lk, num_chunks_lk, d_input, h_histo);
+            runtimes[0][i][j] = glbMemHwdAddCoop(ADD,  INP_LEN, H, B, M_add, num_chunks_add, d_input, h_histo);
+            runtimes[1][i][j] = glbMemHwdAddCoop(CAS,  INP_LEN, H, B, M_cas, num_chunks_cas, d_input, h_histo);
+            runtimes[2][i][j] = glbMemHwdAddCoop(XCHG, INP_LEN, H, B, M_lck, num_chunks_lck, d_input, h_histo);
         }
     }
 
