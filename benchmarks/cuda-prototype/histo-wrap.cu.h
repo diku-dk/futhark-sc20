@@ -115,8 +115,9 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
     cudaMemset(d_histos, 0, mem_size_histos);
     cudaMemset(d_histo , 0, mem_size_histo );
 
-    const int num_gpu_runs = (((select==XCHG) || (select==CAS)) && (histos_per_block==1)) ?
-                             max(1, GPU_RUNS/25) : GPU_RUNS;
+    const int num_gpu_runs = GPU_RUNS;
+                             //(((select==XCHG) || (select==CAS)) && (histos_per_block==1)) ?
+                             //max(1, GPU_RUNS/25) : GPU_RUNS;
 
     unsigned long int elapsed;
     struct timeval t_start, t_end, t_diff;
