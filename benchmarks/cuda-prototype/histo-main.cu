@@ -8,6 +8,15 @@
 #define MIN(a,b)    (((a) < (b)) ? a : b)
 #define MAX(a,b)    (((a) < (b)) ? b : a) 
 
+#define GPU_KIND    2 // 1 -> RTX2080Ti; 2 -> GTX1050Ti
+
+#if (GPU_KIND==1)
+    #define MF 5632
+    #define RF 0.75
+#else // GPU_KIND==2
+    #define MF 1024
+    #define RF 0.5
+#endif
 
 #define GLB_K_MIN   2
 
@@ -16,16 +25,17 @@
 #endif
 
 #ifndef STRIDE
-#define STRIDE      1   // = (Max_Ind_Pt - Min_Ind_Pt) / Num_Distinct_Pts
+#define STRIDE      1  // = (Max_Ind_Pt - Min_Ind_Pt) / Num_Distinct_Pts
 #endif
 
 #define CLelmsz     16 // how many elements fit on a L2 cache line
 
-#define L2Cache     (5632*1024) // 1024* for GTX1050Ti
+#define L2Cache     (MF*1024)
 #define L2Fract     0.4
 
 #if 1
-  #define RACE_EXPNS MAX(1.0, 0.75 * (((float)RACE_FACT)/CLelmsz) * ( (CLelmsz>STRIDE) ? (CLelmsz/STRIDE) : 1 ) ) // 0.5* for GTX1050Ti
+  #define CTGRACE     0
+  #define RACE_EXPNS MAX(1.0, RF * (((float)RACE_FACT)/CLelmsz) * ( (CLelmsz>STRIDE) ? (CLelmsz/STRIDE) : 1 ) )
 #else
   #define CTGRACE     1
   #define SHRINK_FACT (0.75*RACE_FACT) //0.625
@@ -64,17 +74,24 @@ unsigned int BLOCK_SZ;
 #include "histo-wrap.cu.h"
 
 
-int autoLocSubHistoDeg(const AtomicPrim prim_kind, const int Q, const int H, const int N) {
+void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int Q, const int H, const int N, int* M, int* num_chunks) {
     const int elms_per_block = (N + BLOCK - 1) / BLOCK;
     const int el_size = (prim_kind == XCHG)? 2*sizeof(int) : sizeof(int);
-    const int m = min((Q*4 / el_size) * BLOCK, elms_per_block) / H;
+    const float m = MIN((Q*4.0 / el_size) * BLOCK, (float)elms_per_block) / H;
+    if (m < 1.0) {
+        *num_chunks = ceil(1.0 / m);
+        *M = 1;
+    } else {
+        *num_chunks = 1;
+        *M = min( (int)floor(m), BLOCK );
+    }
     // cooperation level can be define independently as
     //     C = min(H/k, B) for some smallish k, or
     // derived from M as
     //     C = ceil(BLOCK/M)
     //const int coop = (BLOCK + m - 1) / m;
     //printf("COOP LEVEL: %d, subhistogram degree: %d\n", coop, m);
-    return min(m, BLOCK);
+    //return min(m, BLOCK);
 }
 
 int autoGlbSubHistoDeg(
@@ -110,49 +127,71 @@ void autoGlbChunksSubhists(
 }
 
 void testLocMemAlignmentProblem(const int H, int* h_input, int* h_histo, int* d_input) {
-        
+        int num_chunks = 1;
         unsigned long tm_seq = goldSeqHisto(INP_LEN, H, h_input, h_histo);
         printf("Histogram Sequential        took: %lu microsecs\n", tm_seq);
 
         int histos_per_block = 3*BLOCK/min(H, BLOCK);
 
-        unsigned long tm_cas = locMemHwdAddCoop(CAS, INP_LEN, H, histos_per_block, d_input, h_histo);
+        unsigned long tm_cas = locMemHwdAddCoop(CAS, INP_LEN, H, histos_per_block, num_chunks, d_input, h_histo);
         printf("Histogram H=%d Local-Mem CAS with subhisto-degree %d took: %lu microsecs\n", H, histos_per_block, tm_cas);
 
         histos_per_block = 6*BLOCK/min(H, BLOCK);
-        tm_cas = locMemHwdAddCoop(CAS, INP_LEN, H, histos_per_block, d_input, h_histo);
+        tm_cas = locMemHwdAddCoop(CAS, INP_LEN, H, histos_per_block, num_chunks, d_input, h_histo);
         printf("Histogram H=%d Local-Mem CAS with subhisto-degree %d took: %lu microsecs\n", H, histos_per_block, tm_cas);
 
-        histos_per_block = autoLocSubHistoDeg(CAS, LOCMEMW_PERTHD, H, INP_LEN); 
-        tm_cas = locMemHwdAddCoop(CAS, INP_LEN, H, histos_per_block, d_input, h_histo);
-        printf("Histogram H=%d Local-Mem CAS with subhisto-degree %d took: %lu microsecs\n", H, histos_per_block, tm_cas);
+        autoLocSubHistoDeg(CAS, LOCMEMW_PERTHD, H, INP_LEN, &histos_per_block, &num_chunks); 
+        tm_cas = locMemHwdAddCoop(CAS, INP_LEN, H, histos_per_block, num_chunks, d_input, h_histo);
+        printf("Histogram H=%d Local-Mem CAS with subhisto-degree %d, num chunks: %d, took: %lu microsecs\n",
+               H, histos_per_block, num_chunks, tm_cas);
 }
 
 
 
 void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
-    const int num_histos = 8;
+    const int num_histos = 10;
     const int num_m_degs = 5;
-    const int histo_sizes[num_histos] = { 25, 57, 121, 249, 505, 1024-7, 4096-7, 12288/2-1 }; //{ 64, 128, 256, 512 };
+    const int histo_sizes[num_histos] = { 25, 57, 121, 249, 505, 1024-7, 4096-7, 12288-1, 24575, 4*12*1024-1 };
+                                        //{ 64, 128, 256, 512 };
     //const AtomicPrim atomic_kinds[3] = {ADD, CAS, XCHG};
     const int ks[num_m_degs] = { 0, 1, 3, 6, 33 };
     unsigned long runtimes[3][num_histos][num_m_degs];
 
     for(int i=0; i<num_histos; i++) {
         const int H = histo_sizes[i];
-        const int m_opt = autoLocSubHistoDeg(ADD, LOCMEMW_PERTHD, H, INP_LEN);
+        int m_opt, num_chunks;
+        autoLocSubHistoDeg(ADD, LOCMEMW_PERTHD, H, INP_LEN, &m_opt, &num_chunks);
 
+        // COSMIN is here: this is tricky to adapt since it stores only the
+        //                 subhistos and not the num_chunks factor.
         const int min_HB = min(H,BLOCK);
-        const int subhisto_degs[num_m_degs] = { 1, BLOCK/min_HB, 3*BLOCK/min_HB, 6*BLOCK/min_HB, m_opt }; 
-        //{ m_opt, (8*BLOCK) / min_HB, (4*BLOCK) / min_HB, (1*BLOCK) / min_HB, 1};
+        const int subhisto_degs[num_m_degs] = { 1, BLOCK/min_HB, 3*BLOCK/min_HB, 6*BLOCK/min_HB, m_opt     };
 
         goldSeqHisto(INP_LEN, H, h_input, h_histo);
 
         for(int j=0; j<num_m_degs; j++) {
-            const int histos_per_block = subhisto_degs[j];
-            runtimes[0][i][j] = locMemHwdAddCoop(ADD, INP_LEN, H, histos_per_block, d_input, h_histo);
-            runtimes[1][i][j] = locMemHwdAddCoop(CAS, INP_LEN, H, histos_per_block, d_input, h_histo);
-            runtimes[2][i][j] = locMemHwdAddCoop(XCHG, INP_LEN, H, max(histos_per_block/2,1), d_input, h_histo);
+          if(j == num_m_degs-1) {
+            int histos_per_block, num_chunks;
+            autoLocSubHistoDeg(ADD,  LOCMEMW_PERTHD, H, INP_LEN, &histos_per_block, &num_chunks);
+            runtimes[0][i][j] = locMemHwdAddCoop(ADD,  INP_LEN, H, histos_per_block, num_chunks, d_input, h_histo);
+
+            autoLocSubHistoDeg(CAS,  LOCMEMW_PERTHD, H, INP_LEN, &histos_per_block, &num_chunks);
+            runtimes[1][i][j] = locMemHwdAddCoop(CAS,  INP_LEN, H, histos_per_block, num_chunks, d_input, h_histo);
+
+            autoLocSubHistoDeg(XCHG, LOCMEMW_PERTHD, H, INP_LEN, &histos_per_block, &num_chunks);
+            runtimes[2][i][j] = locMemHwdAddCoop(XCHG, INP_LEN, H, histos_per_block, num_chunks, d_input, h_histo); 
+
+          } else {
+            const int lmem = LOCMEMW_PERTHD*BLOCK;
+            int M = subhisto_degs[j];
+            int num_chunks = (M*H + lmem - 1) / lmem;
+            runtimes[0][i][j] = locMemHwdAddCoop(ADD,  INP_LEN, H, M, num_chunks, d_input, h_histo);
+            runtimes[1][i][j] = locMemHwdAddCoop(CAS,  INP_LEN, H, M, num_chunks, d_input, h_histo);
+
+            //M = max(M/2, 1);
+            num_chunks = (2*M*H + lmem - 1) / lmem;
+            runtimes[2][i][j] = locMemHwdAddCoop(XCHG, INP_LEN, H, M, num_chunks, d_input, h_histo);
+          }
         }
     }
 
@@ -289,11 +328,11 @@ int main() {
 #endif
 
 
-#if 0
+#if 1
     runLocalMemDataset(h_input, h_histo, d_input);
 #endif
 
-#if 1
+#if 0
     runGlobalMemDataset(h_input, h_histo, d_input);
 #endif
     // 7. clean up memory

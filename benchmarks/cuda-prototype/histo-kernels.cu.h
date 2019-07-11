@@ -1,7 +1,8 @@
 #ifndef HISTO_KERNELS
 #define HISTO_KERNELS
 
-#define STRIDED_MODE 0
+#define STRIDED_MODE_LOC 1
+#define STRIDED_MODE_GLB 0
 
 enum AtomicPrim {ADD, CAS, XCHG};
 enum MemoryType {GLBMEM, LOCMEM};
@@ -104,7 +105,7 @@ selectAtomicAdd(volatile int* loc_hists, volatile int* locks, int idx, int v) {
  */
 template<AtomicPrim primKind>
 __global__ void
-locMemHwdAddCoopKernel( const int N, const int H,
+locMemHwdAddCoopKernel0( const int N, const int H,
                         const int M, const int T,
                         int* input, int* histos
 ) {
@@ -114,7 +115,7 @@ locMemHwdAddCoopKernel( const int N, const int H,
     int his_block_sz = M * H;
     int ghid = blockIdx.x * M * H;
 
-#if STRIDED_MODE
+#if STRIDED_MODE_LOC
     int lhid = (tid % M) * H;
 #else
     int C = (blockDim.x + M - 1) / M;
@@ -148,6 +149,57 @@ locMemHwdAddCoopKernel( const int N, const int H,
     }
 }
 
+template<AtomicPrim primKind>
+__global__ void
+locMemHwdAddCoopKernel( const int N, const int H, const int M
+                      , const int chunk_beg, const int chunk_end 
+                      , const int T, int* input,  int* histos
+) {
+    extern __shared__ volatile int loc_hists[];
+    const unsigned int tid = threadIdx.x;
+    const unsigned int gid = blockIdx.x * blockDim.x + tid;
+    const unsigned int Hchunk = chunk_end - chunk_beg;
+    int his_block_sz = M * Hchunk;
+    int ghid = blockIdx.x * M * H;
+    
+
+#if STRIDED_MODE_LOC
+    int lhid = (tid % M) * Hchunk;
+#else
+    int C = (blockDim.x + M - 1) / M;
+    int lhid = (tid / C) * Hchunk;    
+#endif
+    
+    { // initialize local histograms (and locks if in case XCHG)
+        unsigned int tot_len = M*(chunk_end - chunk_beg);
+        if(primKind == XCHG)  tot_len *= 2;
+
+        for(int i=tid; i<tot_len; i+=blockDim.x) {
+            loc_hists[i] = 0;
+        }
+        __syncthreads();
+    }
+
+    // compute local histograms
+    //if(gid < T) 
+    {
+        for(int i=gid; i<N; i+=T) {
+          struct indval<int> iv = f<int>(input[i], H);
+          if (iv.index >= chunk_beg && iv.index < chunk_end)
+            selectAtomicAdd<primKind, LOCMEM>( loc_hists, loc_hists+his_block_sz
+                                             , lhid+iv.index-chunk_beg, iv.value );
+        }
+    }
+    __syncthreads();
+
+    // copy local histograms to global memory
+    for(int i=tid; i<his_block_sz; i+=blockDim.x) {
+        const int hist_ind =  i / Hchunk;
+        const int indH = (i % Hchunk) + chunk_beg;
+        histos[ghid + hist_ind*H + indH] = loc_hists[i];
+    }
+}
+
 /**************************************************/
 /*** Global-Memory Histogram Computation Kernel ***/
 /**************************************************/
@@ -161,7 +213,7 @@ glbMemHwdAddCoopKernel( const int N, const int H,
                         volatile int* locks
 ) {
     const unsigned int gid = blockIdx.x * blockDim.x + threadIdx.x;
-#if STRIDED_MODE
+#if STRIDED_MODE_GLB
     int ghidx = (gid % M) * H;
 #else
     int C = (T + M - 1) / M;

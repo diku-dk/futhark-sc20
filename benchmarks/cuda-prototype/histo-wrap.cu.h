@@ -70,15 +70,20 @@ goldSeqHisto(const int N, const int H, int* input, int* histo) {
 /*** Local-Memory Histograms ***/
 /*******************************/
 unsigned long
-locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_per_block, int* d_input, int* h_ref_histo) {
+locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_per_block
+                , const int num_chunks, int* d_input, int* h_ref_histo) {
     if(histos_per_block <= 0) {
         printf("Illegal subhistogram degree: %d, H:%d, XCG?=%d, EXITING!\n", histos_per_block, H, (select==XCHG));
         exit(0);
     }
 
     // setup execution parameters
+    const int    Hchunk = (H + num_chunks - 1) / num_chunks;
     const size_t num_blocks = (NUM_THREADS(N) + BLOCK - 1) / BLOCK; 
-    const size_t shmem_size = histos_per_block * H * sizeof(int);
+    const size_t shmem_size = histos_per_block * Hchunk * sizeof(int);
+
+    printf( "Running Subhistogram degree: %d, num-chunks: %d, H: %d, Hchunk: %d, XCG?= %d\n"
+          , histos_per_block, num_chunks, H, Hchunk, (select==XCHG) );
 
     const size_t mem_size_histo  = H * sizeof(int);
     const size_t mem_size_histos = histos_per_block * num_blocks * mem_size_histo;
@@ -89,15 +94,19 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
     cudaMalloc((void**) &d_histo,  H * sizeof(int));
 
     { // dry run
-      if(select == ADD) {
-        locMemHwdAddCoopKernel<ADD><<< num_blocks, BLOCK, shmem_size >>>
-            (N, H, histos_per_block, NUM_THREADS(N), d_input, d_histos);
-      } else if (select == CAS){
-        locMemHwdAddCoopKernel<CAS><<< num_blocks, BLOCK, shmem_size >>>
-            (N, H, histos_per_block, NUM_THREADS(N), d_input, d_histos);
-      } else { // select == XCHG
-        locMemHwdAddCoopKernel<XCHG><<< num_blocks, BLOCK, 2*shmem_size >>>
-            (N, H, histos_per_block, NUM_THREADS(N), d_input, d_histos);
+      for(int k=0; k<num_chunks; k++) {
+        const int chunkLB = k*Hchunk;
+        const int chunkUB = min(H, (k+1)*Hchunk);
+        if(select == ADD) {
+          locMemHwdAddCoopKernel<ADD><<< num_blocks, BLOCK, shmem_size >>>
+              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
+        } else if (select == CAS){
+          locMemHwdAddCoopKernel<CAS><<< num_blocks, BLOCK, shmem_size >>>
+              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
+        } else { // select == XCHG
+          locMemHwdAddCoopKernel<XCHG><<< num_blocks, BLOCK, 2*shmem_size >>>
+              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
+        }
       }
     }
     cudaThreadSynchronize();
@@ -114,15 +123,20 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
     gettimeofday(&t_start, NULL); 
 
     for(int q=0; q<num_gpu_runs; q++) {
-      if(select == ADD) {
-        locMemHwdAddCoopKernel<ADD><<< num_blocks, BLOCK, shmem_size >>>
-            (N, H, histos_per_block, NUM_THREADS(N), d_input, d_histos);
-      } else if (select == CAS){
-        locMemHwdAddCoopKernel<CAS><<< num_blocks, BLOCK, shmem_size >>>
-            (N, H, histos_per_block, NUM_THREADS(N), d_input, d_histos);
-      } else { // select == XCHG
-        locMemHwdAddCoopKernel<XCHG><<< num_blocks, BLOCK, 2*shmem_size >>>
-            (N, H, histos_per_block, NUM_THREADS(N), d_input, d_histos);
+      for(int k=0; k<num_chunks; k++) {
+        const int chunkLB = k*Hchunk;
+        const int chunkUB = min(H, (k+1)*Hchunk);
+
+        if(select == ADD) {
+          locMemHwdAddCoopKernel<ADD><<< num_blocks, BLOCK, shmem_size >>>
+              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
+        } else if (select == CAS){
+          locMemHwdAddCoopKernel<CAS><<< num_blocks, BLOCK, shmem_size >>>
+              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
+        } else { // select == XCHG
+          locMemHwdAddCoopKernel<XCHG><<< num_blocks, BLOCK, 2*shmem_size >>>
+              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
+        }
       }
     }
     cudaThreadSynchronize();
@@ -148,7 +162,7 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
         if(!is_valid) {
             int coop = (BLOCK + histos_per_block - 1) / histos_per_block;
             printf( "locMemHwdAddCoop: Validation FAILS! M:%d, coop:%d, H:%d, ADD:%d, Exiting!\n\n"
-                  , histos_per_block, coop, H, (int)(select==ADD) );
+                  , histos_per_block, coop, H, (int)select );
             exit(1);
         }
     }
