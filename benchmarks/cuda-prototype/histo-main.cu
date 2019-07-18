@@ -149,9 +149,10 @@ void testLocMemAlignmentProblem(const int H, int* h_input, int* h_histo, int* d_
 
 
 void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
-    const int num_histos = 10;
+    const int num_histos = 7;
     const int num_m_degs = 5;
-    const int histo_sizes[num_histos] = { 25, 57, 121, 249, 505, 1024-7, 4096-7, 12288-1, 24575, 4*12*1024-1 };
+    const int histo_sizes[num_histos] = {25, 121, 505, 4089, 12287, 24575, 49151};
+                                        //{ 25, 57, 121, 249, 505, 1024-7, 4096-7, 12288-1, 24575, 4*12*1024-1 };
                                         //{ 64, 128, 256, 512 };
     //const AtomicPrim atomic_kinds[3] = {ADD, CAS, XCHG};
     const int ks[num_m_degs] = { 0, 1, 3, 6, 33 };
@@ -202,11 +203,15 @@ void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
 
 void runGlobalMemDataset(int* h_input, int* h_histo, int* d_input) {
     const int T = NUM_THREADS(INP_LEN);
-    const int num_histos = 8;
+    const int num_histos = 7;
     const int num_m_degs = 6;
     const int algn = 1;
     const int histo_sizes[num_histos] = { 1*12*1024-algn,  2*12*1024-algn,  4*12*1024-algn
-                                        , 8*12*1024-algn, 16*12*1024-algn, 32*12*1024-algn, 64*12*1024-algn, 128*12*1024-algn };
+                                        , 16*12*1024-algn, 32*12*1024-algn
+                                        , 64*12*1024-algn, 128*12*1024-algn };
+                                        //{ 1*12*1024-algn,  2*12*1024-algn,  4*12*1024-algn
+                                        //, 8*12*1024-algn, 16*12*1024-algn, 32*12*1024-algn
+                                        //, 64*12*1024-algn, 128*12*1024-algn };
     const int subhisto_degs[num_m_degs] = { 1, 4, 8, 16, 32, 33 };    
     unsigned long runtimes[3][num_histos][num_m_degs];
 
