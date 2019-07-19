@@ -8,7 +8,7 @@
 #define MIN(a,b)    (((a) < (b)) ? a : b)
 #define MAX(a,b)    (((a) < (b)) ? b : a) 
 
-#define GPU_KIND    2 // 1 -> RTX2080Ti; 2 -> GTX1050Ti
+#define GPU_KIND    1 // 1 -> RTX2080Ti; 2 -> GTX1050Ti
 
 #if (GPU_KIND==1)
     #define MF 5632
@@ -21,7 +21,7 @@
 #define GLB_K_MIN   2
 
 #ifndef RACE_FACT
-#define RACE_FACT   1 //32  // = H / (Num_Distinct_Pts)
+#define RACE_FACT   32 //32  // = H / (Num_Distinct_Pts)
 #endif
 
 #ifndef STRIDE
@@ -47,7 +47,7 @@
 #endif
 
 #define BLOCK       1024
-#define GPU_RUNS    50
+#define GPU_RUNS    200
 #define CPU_RUNS    1
 
 #define INP_LEN     50000000
@@ -196,8 +196,8 @@ void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
         }
     }
 
-    printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, ks, RACE_FACT);
-    //printLaTex  (runtimes, histo_sizes, ks, RACE_FACT);
+    //printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, ks, RACE_FACT);
+    printLaTex<num_histos,num_m_degs>  (runtimes, histo_sizes, ks, RACE_FACT);
 }
 
 
@@ -248,8 +248,8 @@ void runGlobalMemDataset(int* h_input, int* h_histo, int* d_input) {
     printf("Running Histo in Global Mem: RACE_FACT: %d, STRIDE: %d, RACE_EXPNS: %f, L2Cache:%d, L2Fract: %f\n",
            RACE_FACT, STRIDE, RACE_EXPNS, L2Cache, L2Fract);
 
-    printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RACE_FACT);
-    //printLaTex  (runtimes, histo_sizes, subhisto_degs, RACE_FACT);
+    //printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RACE_FACT);
+    printLaTex<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RACE_FACT);
 }
 
 /////////////////////////////////////////////////////////
@@ -337,7 +337,7 @@ int main() {
     runLocalMemDataset(h_input, h_histo, d_input);
 #endif
 
-#if 1
+#if 0
     runGlobalMemDataset(h_input, h_histo, d_input);
 #endif
     // 7. clean up memory
