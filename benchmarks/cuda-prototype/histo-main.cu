@@ -74,16 +74,19 @@ unsigned int BLOCK_SZ;
 #include "histo-wrap.cu.h"
 
 
-void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int Q, const int H, const int N, int* M, int* num_chunks) {
+void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, int* M, int* num_chunks) {
+    const int lmem = LOCMEMW_PERTHD * BLOCK * 4;
     const int elms_per_block = (N + BLOCK - 1) / BLOCK;
     const int el_size = (prim_kind == XCHG)? 2*sizeof(int) : sizeof(int);
-    const float m = MIN((Q*4.0 / el_size) * BLOCK, (float)elms_per_block) / H;
+    const float m = MIN((lmem*1.0 / el_size), (float)elms_per_block) / H;
     if (m < 1.0) {
         *num_chunks = ceil(1.0 / m);
         *M = 1;
     } else {
-        *num_chunks = 1;
-        *M = min( (int)floor(m), BLOCK );
+        *M = min( min((int)floor(m), (2*lmem)/(el_size*H)), BLOCK );
+        *num_chunks = ((*M) * H + lmem/el_size - 1) / (lmem/el_size);
+//        *num_chunks = 1;
+//        *M = min( (int)floor(m), BLOCK );
     }
     // cooperation level can be define independently as
     //     C = min(H/k, B) for some smallish k, or
@@ -140,7 +143,7 @@ void testLocMemAlignmentProblem(const int H, int* h_input, int* h_histo, int* d_
         tm_cas = locMemHwdAddCoop(CAS, INP_LEN, H, histos_per_block, num_chunks, d_input, h_histo);
         printf("Histogram H=%d Local-Mem CAS with subhisto-degree %d took: %lu microsecs\n", H, histos_per_block, tm_cas);
 
-        autoLocSubHistoDeg(CAS, LOCMEMW_PERTHD, H, INP_LEN, &histos_per_block, &num_chunks); 
+        autoLocSubHistoDeg(CAS, H, INP_LEN, &histos_per_block, &num_chunks); 
         tm_cas = locMemHwdAddCoop(CAS, INP_LEN, H, histos_per_block, num_chunks, d_input, h_histo);
         printf("Histogram H=%d Local-Mem CAS with subhisto-degree %d, num chunks: %d, took: %lu microsecs\n",
                H, histos_per_block, num_chunks, tm_cas);
@@ -161,7 +164,7 @@ void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
     for(int i=0; i<num_histos; i++) {
         const int H = histo_sizes[i];
         int m_opt, num_chunks;
-        autoLocSubHistoDeg(ADD, LOCMEMW_PERTHD, H, INP_LEN, &m_opt, &num_chunks);
+        autoLocSubHistoDeg(ADD, H, INP_LEN, &m_opt, &num_chunks);
 
         // COSMIN is here: this is tricky to adapt since it stores only the
         //                 subhistos and not the num_chunks factor.
@@ -173,13 +176,13 @@ void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
         for(int j=0; j<num_m_degs; j++) {
           if(j == num_m_degs-1) {
             int histos_per_block, num_chunks;
-            autoLocSubHistoDeg(ADD,  LOCMEMW_PERTHD, H, INP_LEN, &histos_per_block, &num_chunks);
+            autoLocSubHistoDeg(ADD,  H, INP_LEN, &histos_per_block, &num_chunks);
             runtimes[0][i][j] = locMemHwdAddCoop(ADD,  INP_LEN, H, histos_per_block, num_chunks, d_input, h_histo);
 
-            autoLocSubHistoDeg(CAS,  LOCMEMW_PERTHD, H, INP_LEN, &histos_per_block, &num_chunks);
+            autoLocSubHistoDeg(CAS,  H, INP_LEN, &histos_per_block, &num_chunks);
             runtimes[1][i][j] = locMemHwdAddCoop(CAS,  INP_LEN, H, histos_per_block, num_chunks, d_input, h_histo);
 
-            autoLocSubHistoDeg(XCHG, LOCMEMW_PERTHD, H, INP_LEN, &histos_per_block, &num_chunks);
+            autoLocSubHistoDeg(XCHG, H, INP_LEN, &histos_per_block, &num_chunks);
             runtimes[2][i][j] = locMemHwdAddCoop(XCHG, INP_LEN, H, histos_per_block, num_chunks, d_input, h_histo); 
 
           } else {
@@ -300,7 +303,7 @@ int main() {
         printf("Histogram Sequential        took: %lu microsecs\n", tm_seq);
 
         int histos_per_block = BLOCK/32;
-        //int histos_per_block = autoLocSubHistoDeg(CAS, 12, H, INP_LEN); 
+        //int histos_per_block = autoLocSubHistoDeg(CAS, H, INP_LEN); 
         unsigned long tm_add = locMemHwdAddCoop(ADD, INP_LEN, H, histos_per_block, d_input, h_histo);
         printf("Histogram Local-Mem ADD with subhisto-degree %d took: %lu microsecs\n", histos_per_block, tm_add);
 
