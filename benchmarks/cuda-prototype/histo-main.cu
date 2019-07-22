@@ -25,7 +25,7 @@
 #endif
 
 #ifndef STRIDE
-#define STRIDE      1  // = (Max_Ind_Pt - Min_Ind_Pt) / Num_Distinct_Pts
+#define STRIDE      16  // = (Max_Ind_Pt - Min_Ind_Pt) / Num_Distinct_Pts
 #endif
 
 #define CLelmsz     16 // how many elements fit on a L2 cache line
@@ -83,10 +83,12 @@ void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, in
         *num_chunks = ceil(1.0 / m);
         *M = 1;
     } else {
-        *M = min( min((int)floor(m), (2*lmem)/(el_size*H)), BLOCK );
-        *num_chunks = ((*M) * H + lmem/el_size - 1) / (lmem/el_size);
-//        *num_chunks = 1;
-//        *M = min( (int)floor(m), BLOCK );
+        // Do Something depending on RF here below,
+        //       w.r.t. the second-term of the min.
+        //*M = min( min((int)floor(m), (2*lmem)/(el_size*H)), BLOCK );
+        //*num_chunks = ((*M) * H + lmem/el_size - 1) / (lmem/el_size);
+        *num_chunks = 1;
+        *M = min( (int)floor(m), BLOCK );
     }
     // cooperation level can be define independently as
     //     C = min(H/k, B) for some smallish k, or
@@ -152,13 +154,14 @@ void testLocMemAlignmentProblem(const int H, int* h_input, int* h_histo, int* d_
 
 
 void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
-    const int num_histos = 7;
-    const int num_m_degs = 5;
-    const int histo_sizes[num_histos] = {25, 121, 505, 4089, 12287, 24575, 49151};
+    const int num_histos = 10;
+    const int num_m_degs = 6;
+    const int histo_sizes[num_histos] = {25, 121, 505, 1024-7, 2048-7, 4089, 6143, 12287, 24575, 49151};
+                                        //{25, 121, 505, 4089, 12287, 24575, 49151};
                                         //{ 25, 57, 121, 249, 505, 1024-7, 4096-7, 12288-1, 24575, 4*12*1024-1 };
                                         //{ 64, 128, 256, 512 };
     //const AtomicPrim atomic_kinds[3] = {ADD, CAS, XCHG};
-    const int ks[num_m_degs] = { 0, 1, 3, 6, 33 };
+    const int ks[num_m_degs] = { 0, 1, 3, 6, 8, 33 };
     unsigned long runtimes[3][num_histos][num_m_degs];
 
     for(int i=0; i<num_histos; i++) {
