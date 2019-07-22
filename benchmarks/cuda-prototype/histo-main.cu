@@ -87,7 +87,8 @@ void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, in
         const float c = BLOCK / m;
         const int f = max( 1, (int) floor(c*RACE_FACT / (m * H)) );
         *M = min( (int) floor(m*f), BLOCK);
-        *num_chunks = ((*M) * H + lmem/el_size - 1) / (lmem/el_size);
+        const int len = lmem / (el_size * M);
+        *num_chunks = (H + len - 1) / len;
 //        *num_chunks = 1;
 //        *M = min( (int)floor(m), BLOCK );
     }
