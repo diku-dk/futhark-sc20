@@ -85,7 +85,7 @@ void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, in
     } else {
         // Cosmin: test if this works reasonably well!
         const float c = BLOCK / m;
-        const float f = MAX( 1.0, c*RACE_FACT / (m * H) );
+        const float f = MAX( 1.0, floor(c*RACE_FACT / (m * H)) );
         *M = min( (int) floor(m*f), BLOCK);
         const int len = lmem / (el_size * (*M));
         *num_chunks = (H + len - 1) / len;
