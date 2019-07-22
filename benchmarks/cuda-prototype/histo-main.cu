@@ -77,7 +77,8 @@ unsigned int BLOCK_SZ;
 void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, int* M, int* num_chunks) {
     const int lmem = LOCMEMW_PERTHD * BLOCK * 4;
     const int elms_per_block = (N + BLOCK - 1) / BLOCK;
-    const int el_size = (prim_kind == XCHG)? 2*sizeof(int) : sizeof(int);
+    const int el_size_tot = (prim_kind == XCHG)? 2*sizeof(int) : sizeof(int);
+    const int el_size = sizeof(int);
     const float m = MIN((lmem*1.0 / el_size), (float)elms_per_block) / H;
     if (m < 1.0) {
         *num_chunks = ceil(1.0 / m);
@@ -85,9 +86,9 @@ void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, in
     } else {
         // Cosmin: test if this works reasonably well!
         const float c = BLOCK / m;
-        const float f = MAX( 1.0, floor(c*RACE_FACT / (m * H)) );
+        const float f = MAX( 1.0, c*RACE_FACT / (m * H) );
         *M = min( (int) floor(m*f), BLOCK);
-        const int len = lmem / (el_size * (*M));
+        const int len = lmem / (el_size_tot * (*M));
         *num_chunks = (H + len - 1) / len;
         printf("In computeLocM: prim-kind %d, H %d, result f: %f, m: %f, M: %d, num_chunks: %d\n"
               , prim_kind, H, f, m, *M, *num_chunks);
