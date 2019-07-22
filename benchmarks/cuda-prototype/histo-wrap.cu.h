@@ -82,8 +82,8 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
     const size_t num_blocks = (NUM_THREADS(N) + BLOCK - 1) / BLOCK; 
     const size_t shmem_size = histos_per_block * Hchunk * sizeof(int);
 
-    printf( "Running Subhistogram degree: %d, num-chunks: %d, H: %d, Hchunk: %d, XCG?= %d\n"
-          , histos_per_block, num_chunks, H, Hchunk, (select==XCHG) );
+    printf( "Running Subhistogram degree: %d, num-chunks: %d, H: %d, Hchunk: %d, XCG?= %d, shmem: %ld\n"
+          , histos_per_block, num_chunks, H, Hchunk, (select==XCHG), shmem_size );
 
     const size_t mem_size_histo  = H * sizeof(int);
     const size_t mem_size_histos = histos_per_block * num_blocks * mem_size_histo;
