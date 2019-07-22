@@ -21,7 +21,7 @@
 #define GLB_K_MIN   2
 
 #ifndef RACE_FACT
-#define RACE_FACT   32 //32  // = H / (Num_Distinct_Pts)
+#define RACE_FACT   64 //32  // = H / (Num_Distinct_Pts)
 #endif
 
 #ifndef STRIDE
