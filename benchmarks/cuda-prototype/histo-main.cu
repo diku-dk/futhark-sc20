@@ -87,8 +87,11 @@ void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, in
         const float c = BLOCK / m;
         const int f = max( 1, (int) floor(c*RACE_FACT / (m * H)) );
         *M = min( (int) floor(m*f), BLOCK);
-        const int len = lmem / (el_size * M);
+        const int len = lmem / (el_size * (*M));
         *num_chunks = (H + len - 1) / len;
+        printf("In compute M: prim-kind %d, H %d, result f: %f, m: %f, M: %d, num_chunks: %d\n"
+              , prim_kind, H, f, m, *M, *num_chunks);
+
 //        *num_chunks = 1;
 //        *M = min( (int)floor(m), BLOCK );
     }
@@ -156,9 +159,9 @@ void testLocMemAlignmentProblem(const int H, int* h_input, int* h_histo, int* d_
 
 
 void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
-    const int num_histos = 10;
+    const int num_histos = 6;
     const int num_m_degs = 6;
-    const int histo_sizes[num_histos] = {25, 121, 505, 1024-7, 2048-7, 4089, 6143, 12287, 24575, 49151};
+    const int histo_sizes[num_histos] = {/*25, 121, 505, 1024-7,*/ 2048-7, 4089, 6143, 12287, 24575, 49151};
                                         //{25, 121, 505, 4089, 12287, 24575, 49151};
                                         //{ 25, 57, 121, 249, 505, 1024-7, 4096-7, 12288-1, 24575, 4*12*1024-1 };
                                         //{ 64, 128, 256, 512 };
