@@ -83,12 +83,13 @@ void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, in
         *num_chunks = ceil(1.0 / m);
         *M = 1;
     } else {
-        // Do Something depending on RF here below,
-        //       w.r.t. the second-term of the min.
-        //*M = min( min((int)floor(m), (2*lmem)/(el_size*H)), BLOCK );
-        //*num_chunks = ((*M) * H + lmem/el_size - 1) / (lmem/el_size);
-        *num_chunks = 1;
-        *M = min( (int)floor(m), BLOCK );
+        // Cosmin: test if this works reasonably well!
+        const float c = BLOCK / m;
+        const int f = max( 1, (int) floor(c*RACE_FACT / (m * H)) );
+        *M = min( (int) floor(m*f), BLOCK);
+        *num_chunks = ((*M) * H + lmem/el_size - 1) / (lmem/el_size);
+//        *num_chunks = 1;
+//        *M = min( (int)floor(m), BLOCK );
     }
     // cooperation level can be define independently as
     //     C = min(H/k, B) for some smallish k, or
