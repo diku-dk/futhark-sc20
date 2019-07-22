@@ -86,7 +86,7 @@ void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, in
     } else {
         // Cosmin: test if this works reasonably well!
         const float c = BLOCK / m;
-        const float f = MAX( 1.0, c*RACE_FACT / (m * H) );
+        const float f = MAX( 1.0, ceil(c*RACE_FACT / (m * H)) );
         *M = min( (int) floor(m*f), BLOCK);
         printf("In computeLocM: prim-kind %d, H %d, result f: %f, m: %f, M: %d\n"
               , prim_kind, H, f, m, *M);
