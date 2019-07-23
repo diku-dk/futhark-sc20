@@ -80,7 +80,7 @@ void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, in
     const int el_size_tot = (prim_kind == XCHG)? 2*sizeof(int) : sizeof(int);
     const int el_size = sizeof(int);
 
-    float m = MIN((lmem*1.0 / el_tot_size), (float)elms_per_block) / H;
+    float m = MIN((lmem*1.0 / el_size_tot), (float)elms_per_block) / H;
 
     if (prim_kind == ADD) {
         *M = max(1, min( (int)floor(m), BLOCK ) );
