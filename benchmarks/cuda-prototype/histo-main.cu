@@ -90,7 +90,8 @@ void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, in
         // Cosmin: test if this works reasonably well!
         m = max(1.0, m);
         const float c = BLOCK / m;
-        float tmp1 = c*min(RACE_FACT,32) / (m * H);
+        const float RF = min(RACE_FACT, 32.0*pow(RACE_FACT/32.0, 0.5)); // min(RACE_FACT, 32);
+        float tmp1 = c*RF / (m * H);
         float tmp = (prim_kind==CAS) ? ceil(tmp1) : floor(tmp1);
         //float tmp  = floor(tmp1);
         const float f = MAX( 1.0, tmp );
