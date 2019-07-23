@@ -91,8 +91,8 @@ void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, in
         m = max(1.0, m);
         const float c = BLOCK / m;
         float tmp = c*min(RACE_FACT,32) / (m * H);
-        //float tmp  = floor(tmp1); //(prim_kind==CAS) ? ceil(tmp) : floor(tmp);
-        const float f = MAX( 1.0, tmp );
+        float tmp1  = floor(tmp); //(prim_kind==CAS) ? ceil(tmp) : floor(tmp);
+        const float f = MAX( 1.0, tmp1 );
         *M = min( (int) floor(m*f), BLOCK);
         printf("In computeLocM: prim-kind %d, H %d, result f: %f, m: %f, M: %d\n"
               , prim_kind, H, tmp, m, *M);
