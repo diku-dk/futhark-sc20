@@ -312,7 +312,7 @@ void printLaTex( const unsigned long runtimes[3][num_histos][num_m_degs]
                , const int kms[num_m_degs]
                , const int R) {
     for(int k=0; k<3; k++) {
-        printf("\\begin{tabular}{|l|l|l|l|l|l|}\\hline\n");
+        printf("\\begin{tabular}{|l|l|l|l|l|l|l|l|}\\hline\n");
         if     (k==0) printf("ADD, R=%d", R);
         else if(k==1) printf("CAS, R=%d", R);
         else if(k==2) printf("XCG, R=%d", R);
