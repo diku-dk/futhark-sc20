@@ -208,13 +208,13 @@ void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
           } else {
             const int lmem = LOCMEMW_PERTHD*BLOCK;
             int M = subhisto_degs[j];
-            int len = lmem / (*M);
+            int len = lmem / M;
             int num_chunks = (H + len - 1) / len;
             runtimes[0][i][j] = locMemHwdAddCoop(ADD,  INP_LEN, H, M, num_chunks, d_input, h_histo);
             runtimes[1][i][j] = locMemHwdAddCoop(CAS,  INP_LEN, H, M, num_chunks, d_input, h_histo);
 
             //M = max(M/2, 1);
-            len = lmem / (2*(*M));
+            len = lmem / (2*M);
             num_chunks = (H + len - 1) / len;
             runtimes[2][i][j] = locMemHwdAddCoop(XCHG, INP_LEN, H, M, num_chunks, d_input, h_histo);
           }
