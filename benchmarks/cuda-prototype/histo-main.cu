@@ -178,7 +178,7 @@ void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
                                         //{ 25, 57, 121, 249, 505, 1024-7, 4096-7, 12288-1, 24575, 4*12*1024-1 };
                                         //{ 64, 128, 256, 512 };
     //const AtomicPrim atomic_kinds[3] = {ADD, CAS, XCHG};
-    const int ks[num_m_degs] = { 0, 1, 3, 6, 8, 33 };
+    const int ks[num_m_degs] = { 0, 1, 3, 6, 9, 33 };
     unsigned long runtimes[3][num_histos][num_m_degs];
 
     for(int i=0; i<num_histos; i++) {
@@ -208,12 +208,14 @@ void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
           } else {
             const int lmem = LOCMEMW_PERTHD*BLOCK;
             int M = subhisto_degs[j];
-            int num_chunks = (M*H + lmem - 1) / lmem;
+            int len = lmem / (*M);
+            int num_chunks = (H + len - 1) / len;
             runtimes[0][i][j] = locMemHwdAddCoop(ADD,  INP_LEN, H, M, num_chunks, d_input, h_histo);
             runtimes[1][i][j] = locMemHwdAddCoop(CAS,  INP_LEN, H, M, num_chunks, d_input, h_histo);
 
             //M = max(M/2, 1);
-            num_chunks = (2*M*H + lmem - 1) / lmem;
+            len = lmem / (2*(*M));
+            num_chunks = (H + len - 1) / len;
             runtimes[2][i][j] = locMemHwdAddCoop(XCHG, INP_LEN, H, M, num_chunks, d_input, h_histo);
           }
         }
