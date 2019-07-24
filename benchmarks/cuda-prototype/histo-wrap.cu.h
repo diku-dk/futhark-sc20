@@ -325,7 +325,7 @@ void printLaTex( const unsigned long runtimes[3][num_histos][num_m_degs]
             else                       printf("Ours");
             
             for(int i = 0; i<num_histos; i++) {
-                printf("\t& %f.2", runtimes[k][i][j]/1000.0);
+                printf("\t& %3.2f", runtimes[k][i][j]/1000.0);
             }
             printf("\\\\");
             if(j == (num_m_degs-1)) printf("\\hline");
