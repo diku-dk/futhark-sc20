@@ -189,7 +189,7 @@ void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
         // COSMIN is here: this is tricky to adapt since it stores only the
         //                 subhistos and not the num_chunks factor.
         const int min_HB = min(H,BLOCK);
-        const int subhisto_degs[num_m_degs] = { 1, BLOCK/min_HB, 3*BLOCK/min_HB, 6*BLOCK/min_HB, 8*BLOCK/min_HB, m_opt };
+        const int subhisto_degs[num_m_degs] = { 1, BLOCK/min_HB, 3*BLOCK/min_HB, 6*BLOCK/min_HB, 9*BLOCK/min_HB, m_opt };
 
         goldSeqHisto(INP_LEN, H, h_input, h_histo);
 
