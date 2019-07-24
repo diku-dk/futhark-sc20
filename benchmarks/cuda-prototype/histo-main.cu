@@ -80,23 +80,28 @@ void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, in
     const int el_size_tot = (prim_kind == XCHG)? 2*sizeof(int) : sizeof(int);
     const int el_size = sizeof(int);
 
-    float m = MIN((lmem*1.0 / el_size_tot), (float)elms_per_block) / H;
+    float m     = MIN( (lmem*1.0 / el_size)    , (float)elms_per_block ) / H;
+    float m_tot = MIN( (lmem*1.0 / el_size_tot), (float)elms_per_block ) / H;
 
     if (prim_kind == ADD) {
         *M = max(1, min( (int)floor(m), BLOCK ) );
 //    } else if (m < 1.0) {
 //        *M = 1;
     } else {
-        // Cosmin: test if this works reasonably well!
+        // Cosmin: STILL FIX ME!!!
         m = max(1.0, m);
         const float c = BLOCK / m;
         const float RFC = MIN( (float)RACE_FACT, 32.0*pow(RACE_FACT/32.0, 0.33) );
         float tmp1 = c*RFC / (m * H);
-        float tmp = (prim_kind==CAS) ? ceil(tmp1) : floor(tmp1);
-        const float f = MAX( 1.0, tmp );
-        *M = min( (int) floor(m*f), BLOCK);
+        if (m_tot / m > tmp1) {
+            *M = m_tot;
+        } else {
+            float tmp = (prim_kind==CAS) ? ceil(tmp1) : floor(tmp1);
+            float f = MAX( 1.0, tmp );
+            *M = min( (int) floor(m*f), BLOCK);
+        }
         printf("In computeLocM: prim-kind %d, H %d, result f: %f, m: %f, M: %d\n"
-              , prim_kind, H, tmp, m, *M);
+              , prim_kind, H, tmp1, m, *M);
     }
     const int len = lmem / (el_size_tot * (*M));
     *num_chunks = (H + len - 1) / len;
