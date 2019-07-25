@@ -85,8 +85,6 @@ void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, in
 
     if (prim_kind == ADD) {
         *M = max(1, min( (int)floor(m), BLOCK ) );
-//    } else if (m < 1.0) {
-//        *M = 1;
     } else {
         // Cosmin: STILL FIX ME!!!
         m = max(1.0, m);
