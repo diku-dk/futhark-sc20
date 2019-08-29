@@ -73,8 +73,33 @@ unsigned int BLOCK_SZ;
 #include "histo-kernels.cu.h"
 #include "histo-wrap.cu.h"
 
-
 void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, int* M, int* num_chunks) {
+    const int lmem = LOCMEMW_PERTHD * BLOCK * 4;
+    const int elms_per_block = (N + BLOCK - 1) / BLOCK;
+    const int el_size = (prim_kind == XCHG)? 3*sizeof(int) : sizeof(int);
+
+    float m_prime = MIN( (lmem*1.0 / el_size), (float)elms_per_block ) / H;
+
+    if (prim_kind == ADD) {
+        *M = max(1, min( (int)floor(m_prime), BLOCK ) );
+    } else {
+        float m = max(1.0, m_prime);
+        const float c = BLOCK / m;
+        const float RFC = MIN( (float)RACE_FACT, 32.0*pow(RACE_FACT/32.0, 0.33) );
+        const float f_prime = (BLOCK*RFC) / (m*m*H);
+        const int   f = max(1, (int)ceil(f_prime));
+        *M = min( (int) floor(m*f), BLOCK);
+
+        printf("In computeLocM: prim-kind %d, H %d, result f: %f, m: %f, M: %d\n"
+              , prim_kind, H, f_prime, m, *M);
+    }
+    const int len = lmem / (el_size * (*M));
+    *num_chunks = (H + len - 1) / len;
+}
+
+
+
+void autoLocSubHistoDeg0(const AtomicPrim prim_kind, const int H, const int N, int* M, int* num_chunks) {
     const int lmem = LOCMEMW_PERTHD * BLOCK * 4;
     const int elms_per_block = (N + BLOCK - 1) / BLOCK;
     const int el_size_tot = (prim_kind == XCHG)? 3*sizeof(int) : sizeof(int);
