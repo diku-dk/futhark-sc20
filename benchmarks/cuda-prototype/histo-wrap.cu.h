@@ -55,19 +55,19 @@ int gpuAssert(cudaError_t code) {
 /**********************************/
 void computeSeqIntAddHisto(const int N, const int H, int* input, uint32_t* histo) {
     for(int i=0; i<N; i++) {
-        struct indval<uint32_t> iv = f<uint32_t>(input[i], H);
+        struct indval<uint32_t> iv = f<ADD,uint32_t>(input[i], H);
         histo[iv.index] += iv.value;
     }
 }
 void computeSeqSatAddHisto(const int N, const int H, int* input, uint32_t* histo) {
     for(int i=0; i<N; i++) {
-        struct indval<uint32_t> iv = f<uint32_t>(input[i], H);
+        struct indval<uint32_t> iv = f<CAS,uint32_t>(input[i], H);
         histo[iv.index] = satadd(histo[iv.index], iv.value);
     }
 }
 void computeSeqArgMinHisto(const int N, const int H, int* input, uint64_t* histo) {
     for(int i=0; i<N; i++) {
-        struct indval<uint64_t> iv = f<uint64_t>(input[i], H);
+        struct indval<uint64_t> iv = f<XCHG,uint64_t>(input[i], H);
         histo[iv.index] = argmin(histo[iv.index], iv.value);
     }
 }

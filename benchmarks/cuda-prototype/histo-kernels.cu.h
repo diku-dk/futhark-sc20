@@ -229,7 +229,7 @@ locMemHwdAddCoopKernel( const int N, const int H, const int M
     //if(gid < T) 
     {
         for(int i=gid; i<N; i+=T) {
-          struct indval<BETA> iv = f<BETA>(input[i], H);
+          struct indval<BETA> iv = f<primKind,BETA>(input[i], H);
           if (iv.index >= chunk_beg && iv.index < chunk_end)
             selectAtomicAdd<primKind, LOCMEM, BETA>
                 ( loc_hists, loc_locks
@@ -267,7 +267,7 @@ glbMemHwdAddCoopKernel( const int N, const int H,
 #endif
     // compute histograms; assumes histograms have been previously initialized
     for(int i=gid; i<N; i+=T) {
-        struct indval<BETA> iv = f<BETA>(input[i], H);
+        struct indval<BETA> iv = f<primKind,BETA>(input[i], H);
         if (iv.index >= chunk_beg && iv.index < chunk_end)
             selectAtomicAdd<primKind, GLBMEM, BETA>(histos, locks, ghidx+iv.index, iv.value);
     }
