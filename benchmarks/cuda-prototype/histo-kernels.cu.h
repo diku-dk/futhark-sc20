@@ -16,7 +16,7 @@ struct indval {
   T value;
 };
 
-template<class T>
+template<AtomicPrim primKind, class T>
 __device__ __host__ inline
 struct indval<T>
 f(int pixel, uint32_t his_sz) {
@@ -28,7 +28,11 @@ f(int pixel, uint32_t his_sz) {
 #else
   iv.index = contraction * RACE_FACT;
 #endif
-  iv.value = (T)pixel;
+  if(primKind == CAS) {
+    iv.value = 1;
+  } else {
+    iv.value = (T)pixel;
+  }
   return iv;
 }
 
