@@ -47,7 +47,7 @@
 #endif
 
 #define BLOCK       1024
-#define GPU_RUNS    50
+#define GPU_RUNS    10
 #define CPU_RUNS    1
 
 #define INP_LEN     50000000
@@ -84,10 +84,10 @@ void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, in
         *M = max(1, min( (int)floor(m_prime), BLOCK ) );
     } else {
         float m = max(1.0, m_prime);
-        const float c = BLOCK / m;
         const float RFC = MIN( (float)RACE_FACT, 32.0*pow(RACE_FACT/32.0, 0.33) );
-        const float f_prime = (BLOCK*RFC) / (m*m*H);
-        const int   f = max(1, (int)ceil(f_prime));
+        float f_prime = (BLOCK*RFC) / (m*m*H);
+        int   f_lower = (prim_kind==CAS) ? (int)ceil(f_prime) : (int)floor(f_prime);
+        const int   f = max(1, f_lower);
         *M = min( (int) floor(m*f), BLOCK);
 
         printf("In computeLocM: prim-kind %d, H %d, result f: %f, m: %f, M: %d\n"
