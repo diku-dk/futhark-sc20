@@ -34,8 +34,13 @@ let fivepoint [n] 'a (op: a -> a -> a) (scale: a -> f32 -> a) (xs: [n]a) =
                        scale (pick i) 6 `op`
                        scale (pick (i+1)) 4 `op` pick (i+2))
 
-entry bilateral_filter s_sigma r_sigma I =
-  let grid = bilateral_grid s_sigma r_sigma I
+let lerp (v0, v1, t) =
+  v0 + (v1-v0)*f32.max 0 (f32.min 1 t)
+
+let shape_3d [n][m][k] 't (_: [n][m][k]t) = (n, m, k)
+
+entry bilateral_filter (s_sigma: i32) r_sigma I =
+  let grid = bilateral_grid (r32 s_sigma) r_sigma I
   let smoothen' = map (map (fivepoint (\(x1,y1) (x2,y2) -> (x1+x2, y1+y2))
                                       (\(x, y) c -> (x * c, y * t32 c))))
   let blurz = smoothen' grid
@@ -49,4 +54,26 @@ entry bilateral_filter s_sigma r_sigma I =
               map transpose |>
               smoothen' |>
               map transpose
-  in blury
+
+  let (n, m, k) = shape_3d blury
+
+  let sample arr f x y =
+    let xf = r32 (x % s_sigma) / r32 s_sigma
+    let yf = r32 (y % s_sigma) / r32 s_sigma
+    let xi = x / s_sigma
+    let yi = y / s_sigma
+    let zv = I[x,y] * (1/r_sigma)
+    let zi = t32 zv
+    let zf = zv - r32 zi
+    let pick (i, j, l) = unsafe (f arr[i32.min (n-1) (i32.max 0 i),
+                                       i32.min (m-1) (i32.max 0 j),
+                                       i32.min (k-1) (i32.max 0 l)])
+    in lerp(lerp(lerp(pick(xi, yi, zi), pick(xi+1, yi, zi), xf),
+                 lerp(pick(xi, yi+1, zi), pick(xi+1, yi+1, zi), xf), yf),
+            lerp(lerp(pick(xi, yi, zi+1), pick(xi+1, yi, zi+1), xf),
+                 lerp(pick(xi, yi+1, zi+1), pick(xi+1, yi+1, zi+1), xf), yf), zf)
+
+
+  in map2 (map2 (/))
+          (tabulate_2d n m (sample blury (.1)))
+          (tabulate_2d n m (sample blury ((.2) >-> r32)))
