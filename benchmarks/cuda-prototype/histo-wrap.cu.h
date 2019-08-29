@@ -16,21 +16,33 @@ void randomInit(int* data, int size) {
     for (int i = 0; i < size; ++i)
         data[i] = rand(); // (float)RAND_MAX;
 }
-void zeroOut(int* data, int size) {
+
+template<class T>
+void zeroOut(T* data, int size) {
     for (int i = 0; i < size; ++i)
         data[i] = 0;
 }
-template<class T>
-bool validate(T* A, T* B, unsigned int sizeAB) {
+
+bool validate32(uint32_t* A, uint32_t* B, unsigned int sizeAB) {
     for(int i = 0; i < sizeAB; i++) {
         if (A[i] != B[i]) {
             printf("INVALID RESULT %d %d %d\n", i, A[i], B[i]);
             return false;
         }
     }
-    //printf("VALID RESULT!\n");
     return true;
 }
+
+bool validate64(uint64_t* A, uint64_t* B, unsigned int sizeAB) {
+    for(int i = 0; i < sizeAB; i++) {
+        if (A[i] != B[i]) {
+            printf("INVALID RESULT %d %llu %llu\n", i, A[i], B[i]);
+            return false;
+        }
+    }
+    return true;
+}
+
 int gpuAssert(cudaError_t code) {
   if(code != cudaSuccess) {
     printf("GPU Error: %s\n", cudaGetErrorString(code));
@@ -41,22 +53,42 @@ int gpuAssert(cudaError_t code) {
 /**********************************/
 /*** Golden Sequntial Histogram ***/
 /**********************************/
-void computeSeqHisto(const int N, const int H, int* input, int* histo) {
+void computeSeqIntAddHisto(const int N, const int H, int* input, uint32_t* histo) {
     for(int i=0; i<N; i++) {
-        struct indval<int> iv = f<int>(input[i], H);
+        struct indval<uint32_t> iv = f<uint32_t>(input[i], H);
         histo[iv.index] += iv.value;
     }
 }
+void computeSeqSatAddHisto(const int N, const int H, int* input, uint32_t* histo) {
+    for(int i=0; i<N; i++) {
+        struct indval<uint32_t> iv = f<uint32_t>(input[i], H);
+        histo[iv.index] = satadd(histo[iv.index], iv.value);
+    }
+}
+void computeSeqArgMinHisto(const int N, const int H, int* input, uint64_t* histo) {
+    for(int i=0; i<N; i++) {
+        struct indval<uint64_t> iv = f<uint64_t>(input[i], H);
+        histo[iv.index] = argmin(histo[iv.index], iv.value);
+    }
+}
 
+
+template<AtomicPrim select>
 unsigned long
-goldSeqHisto(const int N, const int H, int* input, int* histo) {
+goldSeqHisto(const int N, const int H, int* input, uint32_t* histo) {
     unsigned long int elapsed;
     struct timeval t_start, t_end, t_diff;
     gettimeofday(&t_start, NULL);
 
     for(int q=0; q<CPU_RUNS; q++) {
         zeroOut(histo, H);
-        computeSeqHisto(N, H, input, histo);
+        if (select == ADD) {
+            computeSeqIntAddHisto(N, H, input, histo);
+        } else if (select == CAS) {
+            computeSeqSatAddHisto(N, H, input, histo);
+        } else {  // select == XCHG
+            computeSeqArgMinHisto(N, H, input, (uint64_t*)histo);
+        }
     }
 
     gettimeofday(&t_end, NULL);
@@ -71,7 +103,7 @@ goldSeqHisto(const int N, const int H, int* input, int* histo) {
 /*******************************/
 unsigned long
 locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_per_block
-                , const int num_chunks, int* d_input, int* h_ref_histo) {
+                , const int num_chunks, int* d_input, uint32_t* h_ref_histo) {
     if(histos_per_block <= 0) {
         printf("Illegal subhistogram degree: %d, H:%d, XCG?=%d, EXITING!\n", histos_per_block, H, (select==XCHG));
         exit(0);
@@ -80,32 +112,33 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
     // setup execution parameters
     const int    Hchunk = (H + num_chunks - 1) / num_chunks;
     const size_t num_blocks = (NUM_THREADS(N) + BLOCK - 1) / BLOCK; 
-    const size_t shmem_size = histos_per_block * Hchunk * sizeof(int);
+    const size_t shmem_size = histos_per_block * Hchunk * sizeof(uint32_t);
 
     printf( "Running Subhistogram degree: %d, num-chunks: %d, H: %d, Hchunk: %d, XCG?= %d, shmem: %ld\n"
           , histos_per_block, num_chunks, H, Hchunk, (select==XCHG), shmem_size );
 
-    const size_t mem_size_histo  = H * sizeof(int);
+    const size_t K = (select == XCHG) ? 2 : 1;
+    const size_t mem_size_histo  = H * K * sizeof(int);
     const size_t mem_size_histos = histos_per_block * num_blocks * mem_size_histo;
-    int* d_histos;
-    int* d_histo;
-    int* h_histo = (int*)malloc(H*sizeof(int));
+    uint32_t* d_histos;
+    uint32_t* d_histo;
+    uint32_t* h_histo = (uint32_t*)malloc(mem_size_histo);
     cudaMalloc((void**) &d_histos, mem_size_histos);
-    cudaMalloc((void**) &d_histo,  H * sizeof(int));
+    cudaMalloc((void**) &d_histo,  mem_size_histo );
 
     { // dry run
       for(int k=0; k<num_chunks; k++) {
         const int chunkLB = k*Hchunk;
         const int chunkUB = min(H, (k+1)*Hchunk);
         if(select == ADD) {
-          locMemHwdAddCoopKernel<ADD><<< num_blocks, BLOCK, shmem_size >>>
+          locMemHwdAddCoopKernel<ADD, uint32_t><<< num_blocks, BLOCK, shmem_size >>>
               (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
         } else if (select == CAS){
-          locMemHwdAddCoopKernel<CAS><<< num_blocks, BLOCK, shmem_size >>>
+          locMemHwdAddCoopKernel<CAS, uint32_t><<< num_blocks, BLOCK, shmem_size >>>
               (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
         } else { // select == XCHG
-          locMemHwdAddCoopKernel<XCHG><<< num_blocks, BLOCK, 2*shmem_size >>>
-              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
+          locMemHwdAddCoopKernel<XCHG,uint64_t><<< num_blocks, BLOCK, 3*shmem_size >>>
+              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, (uint64_t*)d_histos);
         }
       }
     }
@@ -129,14 +162,14 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
         const int chunkUB = min(H, (k+1)*Hchunk);
 
         if(select == ADD) {
-          locMemHwdAddCoopKernel<ADD><<< num_blocks, BLOCK, shmem_size >>>
+          locMemHwdAddCoopKernel<ADD, uint32_t><<< num_blocks, BLOCK, shmem_size >>>
               (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
         } else if (select == CAS){
-          locMemHwdAddCoopKernel<CAS><<< num_blocks, BLOCK, shmem_size >>>
+          locMemHwdAddCoopKernel<CAS, uint32_t><<< num_blocks, BLOCK, shmem_size >>>
               (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
         } else { // select == XCHG
-          locMemHwdAddCoopKernel<XCHG><<< num_blocks, BLOCK, 2*shmem_size >>>
-              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
+          locMemHwdAddCoopKernel<XCHG,uint64_t><<< num_blocks, BLOCK, 3*shmem_size >>>
+              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, (uint64_t*)d_histos);
         }
       }
     }
@@ -149,12 +182,26 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
 
     { // reduce across histograms and copy to host
         const size_t num_blocks_red = (H + BLOCK - 1) / BLOCK;
-        naive_reduce_kernel<<< num_blocks_red, BLOCK >>>(d_histos, d_histo, H, histos_per_block*num_blocks);
+        if(select == ADD) {
+            naive_atmadd_reduce_kernel<<< num_blocks_red, BLOCK >>>
+                (d_histos, d_histo, H, histos_per_block*num_blocks);
+        } else if (select == CAS) {
+            naive_satadd_reduce_kernel<<< num_blocks_red, BLOCK >>>
+                (d_histos, d_histo, H, histos_per_block*num_blocks);
+        } else {
+            naive_argmin_reduce_kernel<<< num_blocks_red, BLOCK >>>
+                ((uint64_t*)d_histos, (uint64_t*)d_histo, H, histos_per_block*num_blocks);
+        }
         cudaMemcpy(h_histo, d_histo, mem_size_histo, cudaMemcpyDeviceToHost);
     }
 
     { // validate and free memory
-        bool is_valid = validate<int>(h_histo, h_ref_histo, H);
+        bool is_valid;
+        if (select == XCHG) {
+            is_valid = validate64((uint64_t*)h_histo, (uint64_t*)h_ref_histo, H); 
+        } else {
+            is_valid = validate32(h_histo, h_ref_histo, H);
+        }
 
         free(h_histo);
         cudaFree(d_histos);
@@ -175,7 +222,7 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
 /*** Global-Memory Histograms ***/
 /********************************/
 unsigned long
-glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int B, const int M, const int num_chunks, int* d_input, int* h_ref_histo) {
+glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int B, const int M, const int num_chunks, int* d_input, uint32_t* h_ref_histo) {
     const int T = NUM_THREADS(N);
     const int C = (T + M - 1) / M;
     const int chunk_size = (H + num_chunks - 1) / num_chunks;
@@ -192,13 +239,14 @@ glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int B, const
     
     // setup execution parameters
     const size_t num_blocks = (T + B - 1) / B;
-    const size_t mem_size_histo  = H * sizeof(int);
+    const size_t K = (select == XCHG) ? 2 : 1;
+    const size_t mem_size_histo  = H * K * sizeof(uint32_t);
     const size_t mem_size_histos = M * mem_size_histo;
-    const size_t mem_size_locks  = mem_size_histos;
-    int* d_histos;
-    int* d_histo;
+    const size_t mem_size_locks  = H * sizeof(uint32_t);
+    uint32_t* d_histos;
+    uint32_t* d_histo;
     int* d_locks;
-    int* h_histo = (int*)malloc(H*sizeof(int));
+    uint32_t* h_histo = (uint32_t*)malloc(mem_size_histo);
 
     cudaMalloc((void**) &d_histos, mem_size_histos);
     cudaMalloc((void**) &d_histo,  mem_size_histo );
@@ -210,14 +258,14 @@ glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int B, const
     { // dry run
       for(int k=0; k<num_chunks; k++) {
         if(select == ADD) {
-          glbMemHwdAddCoopKernel<ADD><<< num_blocks, B >>>
+          glbMemHwdAddCoopKernel<ADD, uint32_t><<< num_blocks, B >>>
               (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
         } else if (select == CAS){
-          glbMemHwdAddCoopKernel<CAS><<< num_blocks, B >>>
+          glbMemHwdAddCoopKernel<CAS, uint32_t><<< num_blocks, B >>>
               (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
         } else { // select == XCHG
-          glbMemHwdAddCoopKernel<XCHG><<< num_blocks, B >>>
-              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, d_locks);
+          glbMemHwdAddCoopKernel<XCHG,uint64_t><<< num_blocks, B >>>
+              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, (uint64_t*)d_histos, d_locks);
         }
       }
     }
@@ -234,18 +282,33 @@ glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int B, const
       cudaMemset(d_histos, 0, mem_size_histos);
       for(int k=0; k<num_chunks; k++) {
         if(select == ADD) {
-          glbMemHwdAddCoopKernel<ADD><<< num_blocks, B >>>
+          glbMemHwdAddCoopKernel<ADD, uint32_t><<< num_blocks, B >>>
               (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
         } else if (select == CAS){
-          glbMemHwdAddCoopKernel<CAS><<< num_blocks, B >>>
+          glbMemHwdAddCoopKernel<CAS, uint32_t><<< num_blocks, B >>>
               (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
         } else { // select == XCHG
-          glbMemHwdAddCoopKernel<XCHG><<< num_blocks, B >>>
-              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, d_locks);
+          glbMemHwdAddCoopKernel<XCHG,uint64_t><<< num_blocks, B >>>
+              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, (uint64_t*)d_histos, d_locks);
         }
       }
+
       // reduce across subhistograms
-      naive_reduce_kernel<<< (H+B-1) / B, BLOCK >>>(d_histos, d_histo, H, M);
+      {
+        // the line below seems wrong anyways!
+        // naive_reduce_kernel<<< (H+B-1) / B, BLOCK >>>(d_histos, d_histo, H, M);
+        const size_t num_blocks_red = (H + B - 1) / B;
+        if(select == ADD) {
+            naive_atmadd_reduce_kernel<<< num_blocks_red, B >>>
+                (d_histos, d_histo, H, M);
+        } else if (select == CAS) {
+            naive_satadd_reduce_kernel<<< num_blocks_red, B >>>
+                (d_histos, d_histo, H, M);
+        } else {
+            naive_argmin_reduce_kernel<<< num_blocks_red, B >>>
+                ((uint64_t*)d_histos, (uint64_t*)d_histo, H, M);
+        }
+      }
     }
     cudaThreadSynchronize();
 
@@ -261,7 +324,13 @@ glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int B, const
     }
 
     { // validate and free memory
-        bool is_valid = validate<int>(h_histo, h_ref_histo, H);
+        bool is_valid;
+
+        if (select == XCHG) {
+            is_valid = validate64((uint64_t*)h_histo, (uint64_t*)h_ref_histo, H); 
+        } else {
+            is_valid = validate32(h_histo, h_ref_histo, H);
+        }
 
         free(h_histo);
         cudaFree(d_histos);
