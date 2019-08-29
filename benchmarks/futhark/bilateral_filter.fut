@@ -1,3 +1,7 @@
+-- ==
+-- entry: bilateral_filter
+-- compiled input @ gray.in
+
 let tile [n][m] 'a (bn: i32) (bm: i32) (xss: [n][m]a): [][][]a =
   let tiles_per_n = n / bn
   let tiles_per_m = m / bm
@@ -45,4 +49,4 @@ entry bilateral_filter s_sigma r_sigma I =
               map transpose |>
               smoothen' |>
               map transpose
-  in blury |> map (map (map (.1)))
+  in blury
