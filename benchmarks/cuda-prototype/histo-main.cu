@@ -173,12 +173,12 @@ void autoGlbChunksSubhists0(
 void autoGlbChunksSubhists(
                 const AtomicPrim prim_kind, const int H, const int N, const int T, const int L2,
                 int* M, int* num_chunks ) {
-    const int   el_size = (prim_kind == XCHG)?
-                          3*sizeof(int) : sizeof(int);
+    const int   beta    = (prim_kind == XCHG)? 2*sizeof(int) : sizeof(int);
+    const int   el_size = (prim_kind == XCHG)? 3*sizeof(int) : sizeof(int);
     const float optim_k_min = GLB_K_MIN;
         
     // first part
-    float race_exp = max(1.0, (1.0 * RF * RACE_FACT) / ( (4.0*CLelmsz) / el_size) );
+    float race_exp = max(1.0, (1.0 * RF * RACE_FACT) / ( (4.0*CLelmsz) / beta) );
     float coop_min = MIN( (float)T, H/optim_k_min );
     const int Mdeg  = max(1, (int) (T / coop_min));
     *num_chunks = (int)ceil( Mdeg*H / ( L2Fract * ((1.0*L2Cache) / el_size) * race_exp ) );
