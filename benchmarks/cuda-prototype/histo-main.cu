@@ -84,7 +84,7 @@ void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, in
         *M = max(1, min( (int)floor(m_prime), BLOCK ) );
     } else {
         float m = max(1.0, m_prime);
-        const float RFC = MIN( (float)RACE_FACT, 32.0*pow(RACE_FACT/32.0, 0.33) );
+        const float RFC = MIN( (float)RACE_FACT, 32.0*pow(RACE_FACT/32.0, 0.25) );
         float f_prime = (BLOCK*RFC) / (m*m*H);
         float f_lower = (prim_kind==CAS) ? ceil(f_prime) : floor(f_prime);
         const int  f  = max(1, (int)f_lower);
