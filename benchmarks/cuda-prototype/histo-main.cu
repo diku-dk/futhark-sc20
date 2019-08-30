@@ -73,7 +73,7 @@ unsigned int BLOCK_SZ;
 #include "histo-kernels.cu.h"
 #include "histo-wrap.cu.h"
 
-void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, int* M, int* num_chunks) {
+void autoLocSubHistoDeg0(const AtomicPrim prim_kind, const int H, const int N, int* M, int* num_chunks) {
     const int lmem = LOCMEMW_PERTHD * BLOCK * 4;
     const int elms_per_block = (N + BLOCK - 1) / BLOCK;
     const int el_size = (prim_kind == XCHG)? 3*sizeof(int) : sizeof(int);
@@ -99,11 +99,11 @@ void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, in
 
 
 
-void autoLocSubHistoDeg0(const AtomicPrim prim_kind, const int H, const int N, int* M, int* num_chunks) {
+void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, int* M, int* num_chunks) {
     const int lmem = LOCMEMW_PERTHD * BLOCK * 4;
     const int elms_per_block = (N + BLOCK - 1) / BLOCK;
     const int el_size_tot = (prim_kind == XCHG)? 3*sizeof(int) : sizeof(int);
-    const int el_size = sizeof(int);
+    const int el_size = (prim_kind == XCHG)? 2*sizeof(int) : sizeof(int);
 
     float m     = MIN( (lmem*1.0 / el_size)    , (float)elms_per_block ) / H;
     float m_tot = MIN( (lmem*1.0 / el_size_tot), (float)elms_per_block ) / H;
