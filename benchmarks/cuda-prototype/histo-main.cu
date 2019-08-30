@@ -21,7 +21,7 @@
 #define GLB_K_MIN   2
 
 #ifndef RACE_FACT
-#define RACE_FACT   64 //32  // = H / (Num_Distinct_Pts)
+#define RACE_FACT   32 //32  // = H / (Num_Distinct_Pts)
 #endif
 
 #ifndef STRIDE
@@ -362,11 +362,11 @@ int main() {
     cudaMalloc((void**) &d_input, mem_size_input);
     cudaMemcpy(d_input, h_input, mem_size_input, cudaMemcpyHostToDevice);
 
-#if 1
+#if 0
     runLocalMemDataset(h_input, h_histo, d_input);
 #endif
 
-#if 0
+#if 1
     runGlobalMemDataset(h_input, h_histo, d_input);
 #endif
     // 7. clean up memory
