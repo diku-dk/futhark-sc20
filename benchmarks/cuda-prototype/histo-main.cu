@@ -397,7 +397,7 @@ int main() {
     runLocalMemDataset(h_input, h_histo, d_input);
 #endif
 
-#if 0
+#if 1
     runGlobalMemDataset(h_input, h_histo, d_input);
 #endif
     // 7. clean up memory
