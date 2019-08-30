@@ -393,11 +393,11 @@ int main() {
     cudaMalloc((void**) &d_input, mem_size_input);
     cudaMemcpy(d_input, h_input, mem_size_input, cudaMemcpyHostToDevice);
 
-#if 0
+#if 1
     runLocalMemDataset(h_input, h_histo, d_input);
 #endif
 
-#if 1
+#if 0
     runGlobalMemDataset(h_input, h_histo, d_input);
 #endif
     // 7. clean up memory
