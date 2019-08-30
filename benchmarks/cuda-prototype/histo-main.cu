@@ -173,7 +173,8 @@ void autoGlbChunksSubhists0(
 void autoGlbChunksSubhists(
                 const AtomicPrim prim_kind, const int H, const int N, const int T, const int L2,
                 int* M, int* num_chunks ) {
-    const int   beta    = (prim_kind == XCHG)? 2*sizeof(int) : sizeof(int);
+    // for XCHG we average the size of the lock and of beta
+    const int   beta    = (prim_kind == XCHG)? 3*sizeof(int)/2 : sizeof(int);
     const int   el_size = (prim_kind == XCHG)? 3*sizeof(int) : sizeof(int);
     const float optim_k_min = GLB_K_MIN;
         
