@@ -39,7 +39,8 @@ let lerp (v0, v1, t) =
 
 let shape_3d [n][m][k] 't (_: [n][m][k]t) = (n, m, k)
 
-entry bilateral_filter (s_sigma: i32) r_sigma I =
+entry bilateral_filter [n][m] (s_sigma: i32) (r_sigma: f32) (I: [n][m]f32) =
+  let r_sigma = 0.02
   let grid = bilateral_grid (r32 s_sigma) r_sigma I
   let smoothen' = map (map (fivepoint (\(x1,y1) (x2,y2) -> (x1+x2, y1+y2))
                                       (\(x, y) c -> (x * c, y * t32 c))))
@@ -55,14 +56,14 @@ entry bilateral_filter (s_sigma: i32) r_sigma I =
               smoothen' |>
               map transpose
 
-  let (n, m, k) = shape_3d blury
+  let (_, _, k) = shape_3d blury
 
   let sample arr f x y =
     let xf = r32 (x % s_sigma) / r32 s_sigma
     let yf = r32 (y % s_sigma) / r32 s_sigma
     let xi = x / s_sigma
     let yi = y / s_sigma
-    let zv = I[x,y] * (1/r_sigma)
+    let zv = unsafe I[x,y] * (1/r_sigma)
     let zi = t32 zv
     let zf = zv - r32 zi
     let pick (i, j, l) = unsafe (f arr[i32.min (n-1) (i32.max 0 i),
