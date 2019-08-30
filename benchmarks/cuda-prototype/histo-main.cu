@@ -171,9 +171,9 @@ void autoGlbChunksSubhists(
 }
 
 void runLocalMemDataset(int* h_input, uint32_t* h_histo, int* d_input) {
-    const int num_histos = 7;
+    const int num_histos = 8;
     const int num_m_degs = 6;
-    const int histo_sizes[num_histos] = {25, 121, 505, 6143, 12287, 24575, 49151};
+    const int histo_sizes[num_histos] = {25, 121, 505, 2041, 6143, 12287, 24575, 49151};
                                         //{/*25, 121, 505, 1024-7,*/ 2048-7, 4089, 6143, 12287, 24575, 49151};
                                         //{ 25, 57, 121, 249, 505, 1024-7, 4096-7, 12288-1, 24575, 4*12*1024-1 };
                                         //{ 64, 128, 256, 512 };
