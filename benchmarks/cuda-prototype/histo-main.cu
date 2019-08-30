@@ -149,7 +149,7 @@ int autoGlbSubHistoDeg(
     return max(1, (int) (T / coop));
 }
 
-void autoGlbChunksSubhists(
+void autoGlbChunksSubhists0(
                 const AtomicPrim prim_kind, const int H, const int N, const int T, const int L2,
                 int* M, int* num_chunks ) {
     const int el_size = (prim_kind == XCHG)?
@@ -169,6 +169,31 @@ void autoGlbChunksSubhists(
     printf( "CHUNKING branch: optim_k_min: %f, coop: %f, Mdeg: %d, Hold: %d, Hnew: %d, num_chunks: %d, M: %d\n"
           , optim_k_min, coop, Mdeg, H, Hnew, *num_chunks, *M );
 }
+
+void autoGlbChunksSubhists(
+                const AtomicPrim prim_kind, const int H, const int N, const int T, const int L2,
+                int* M, int* num_chunks ) {
+    const int   el_size = (prim_kind == XCHG)?
+                          3*sizeof(int) : sizeof(int);
+    const float optim_k_min = GLB_K_MIN;
+        
+    // first part
+    float race_exp = max(1.0, (1.0 * RF * RACE_FACT) / (CLelmsz / el_size) );
+    float coop_min = MIN( (float)T, H/optim_k_min );
+    const int Mdeg  = max(1, (int) (T / coop_min));
+    const int H_chk = ( L2Fract * ((1.0*L2Cache) / el_size) * race_exp ) / Mdeg;
+    *num_chunks = (H + H_chk - 1) / H_chk;
+
+    // second part
+    const float u = (prim_kind == ADD) ? 2.0 : 1.0;
+    const float k_max= MIN( L2Fract * ( (1.0*L2Cache) / el_size ) * race_exp, (float)N ) / T;
+    const float coop = MIN( T, (u * H_chk) / k_max );
+    *M = max( 1, (int)floor(T/coop) );
+     
+    printf( "CHUNKING branch: optim_k_min: %f, coop: %f, Mdeg: %d, Hold: %d, Hnew: %d, num_chunks: %d, M: %d\n"
+          , optim_k_min, coop_min, Mdeg, H, H_chk, *num_chunks, *M );
+}
+
 
 void runLocalMemDataset(int* h_input, uint32_t* h_histo, int* d_input) {
     const int num_histos = 8;
