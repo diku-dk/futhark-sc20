@@ -18,7 +18,8 @@ let bilateral_grid [nx][ny] (s_sigma: f32) (r_sigma: f32) (I: [nx][ny]f32) : [][
   let intensity cell =
     reduce_by_index (replicate nz' 0) (+) 0
                     (cell |> map bin)
-                    cell
+                    (map ((*256) >-> t32) cell)
+    |> map (r32 >-> (/256))
   let count cell =
     reduce_by_index (replicate nz' 0) (+) 0
                     (cell |> map bin)
@@ -40,7 +41,6 @@ let lerp (v0, v1, t) =
 let shape_3d [n][m][k] 't (_: [n][m][k]t) = (n, m, k)
 
 entry bilateral_filter [n][m] (s_sigma: i32) (r_sigma: f32) (I: [n][m]f32) =
-  let r_sigma = 0.02
   let grid = bilateral_grid (r32 s_sigma) r_sigma I
   let smoothen' = map (map (fivepoint (\(x1,y1) (x2,y2) -> (x1+x2, y1+y2))
                                       (\(x, y) c -> (x * c, y * t32 c))))
