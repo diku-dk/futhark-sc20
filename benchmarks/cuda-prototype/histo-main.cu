@@ -178,7 +178,7 @@ void autoGlbChunksSubhists(
     const float optim_k_min = GLB_K_MIN;
         
     // first part
-    float race_exp = max(1.0, (1.0 * RF * RACE_FACT) / (CLelmsz / el_size) );
+    float race_exp = max(1.0, (1.0 * RF * RACE_FACT) / ( (4.0*CLelmsz) / el_size) );
     float coop_min = MIN( (float)T, H/optim_k_min );
     const int Mdeg  = max(1, (int) (T / coop_min));
     const int H_chk = ( L2Fract * ((1.0*L2Cache) / el_size) * race_exp ) / Mdeg;
