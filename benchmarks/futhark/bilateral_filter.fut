@@ -19,7 +19,6 @@ let bilateral_grid [nx][ny] (s_sigma: f32) (r_sigma: f32) (I: [nx][ny]f32) : [][
     reduce_by_index (replicate nz' 0) (+) 0
                     (cell |> map bin)
                     (map ((*256) >-> t32) cell)
-    |> map (r32 >-> (/256))
   let count cell =
     reduce_by_index (replicate nz' 0) (+) 0
                     (cell |> map bin)
@@ -27,7 +26,7 @@ let bilateral_grid [nx][ny] (s_sigma: f32) (r_sigma: f32) (I: [nx][ny]f32) : [][
   in map2 (map2 zip)
           (map (map intensity) I_tiled)
           (map (map count) I_tiled)
-
+     |> map (map (map (\(x, y) -> (r32 x / 256, y))))
 
 let fivepoint [n] 'a (op: a -> a -> a) (scale: a -> f32 -> a) (xs: [n]a) =
   let pick i = unsafe xs[i32.min (n-1) (i32.max 0 i)]
