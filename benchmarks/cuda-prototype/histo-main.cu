@@ -173,7 +173,10 @@ void autoGlbChunksSubhists0(
 void autoGlbChunksSubhists(
                 const AtomicPrim prim_kind, const int H, const int N, const int T, const int L2,
                 int* M, int* num_chunks ) {
-    // for XCHG we average the size of the lock and of beta
+    // For the computation of beta on XCHG:
+    //   In principle we average the size of the lock and of the element-type of histogram
+    //   But Futhark uses a tuple-of-array rep: hence we need to average the lock together
+    //     with each element type from the tuple.
     const int   beta    = (prim_kind == XCHG)? 3*sizeof(int)/2 : sizeof(int);
     const int   el_size = (prim_kind == XCHG)? 3*sizeof(int) : sizeof(int);
     const float optim_k_min = GLB_K_MIN;
