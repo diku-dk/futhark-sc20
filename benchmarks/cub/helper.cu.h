@@ -39,4 +39,14 @@ inline void cudaAssert(cudaError_t code, const char *file, int line, bool abort=
   }
 }
 
+inline uint32_t ceilLog2(uint32_t H) {
+    if (H == 0) { printf("Log2(0) is illegal. Exiting!\n"); exit(1); }
+    uint32_t log2_val = 0, pow2_val = 1;
+    while(pow2_val < H) {
+        log2_val ++;
+        pow2_val *= 2;
+    }
+    return log2_val;
+}
+
 #endif // HISTO_HELPER

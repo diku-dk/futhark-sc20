@@ -53,6 +53,9 @@ double sortRedByKeyCUB( uint32_t* data_keys_in,  real* data_vals_in
     uint32_t* unique_keys;
     uint32_t* num_segments;
 
+    int beg_bit = 0;
+    int end_bit = ceilLog2(H);
+
     { // allocating stuff
         cudaMalloc ((void**) &data_keys_out, N * sizeof(uint32_t));
         cudaMalloc ((void**) &data_vals_out, N * sizeof(real));
@@ -67,7 +70,7 @@ double sortRedByKeyCUB( uint32_t* data_keys_in,  real* data_vals_in
         cub::DeviceRadixSort::SortPairs	( tmp_sort_mem, tmp_sort_len
                                         , data_keys_in, data_keys_out
                                         , data_vals_in, data_vals_out
-                                        , (int)N
+                                        , (int)N,   beg_bit,  end_bit
                                     );
         cudaMalloc(&tmp_sort_mem, tmp_sort_len);
     }
@@ -91,7 +94,7 @@ double sortRedByKeyCUB( uint32_t* data_keys_in,  real* data_vals_in
         cub::DeviceRadixSort::SortPairs	( tmp_sort_mem, tmp_sort_len
                                         , data_keys_in, data_keys_out
                                         , data_vals_in, data_vals_out
-                                        , (int)N
+                                        , (int)N,   beg_bit,  end_bit
                                         );
         cub::DeviceReduce::ReduceByKey  ( tmp_red_mem, tmp_red_len
                                         , data_keys_out, unique_keys
@@ -111,7 +114,7 @@ double sortRedByKeyCUB( uint32_t* data_keys_in,  real* data_vals_in
         cub::DeviceRadixSort::SortPairs ( tmp_sort_mem, tmp_sort_len
                                         , data_keys_in, data_keys_out
                                         , data_vals_in, data_vals_out
-                                        , (int)N
+                                        , (int)N,   beg_bit,  end_bit
                                         );
         cub::DeviceReduce::ReduceByKey  ( tmp_red_mem, tmp_red_len
                                         , data_keys_out, unique_keys

@@ -1,5 +1,14 @@
-#include "../../cub-1.8.0/cub/cub.cuh"   // or equivalently <cub/device/device_histogram.cuh>
+//#include "../../cub-1.8.0/cub/cub.cuh"   // or equivalently <cub/device/device_histogram.cuh>
+#include "cub.cuh"
 #include "helper.cu.h"
+
+__global__ void
+setOnesKernel (uint32_t * d_vals, uint32_t N) {
+    const unsigned int gid = blockIdx.x * blockDim.x + threadIdx.x;
+    if(gid < N) {
+        d_vals[gid] = 1;
+    }
+}
 
 template<class Z>
 bool validateZ(Z* A, Z* B, uint32_t sizeAB) {
@@ -23,39 +32,55 @@ void randomInitNat(uint32_t* data, const uint32_t size, const uint32_t H) {
 
 struct SatAdd
 {
-    template <typename T>
     __device__ CUB_RUNTIME_FUNCTION __forceinline__
-    T operator()(const T &a, const T &b) const {
-        uint32_t s = ((uint32_t)a) + ((uint32_t)b);
-        return (s > 255) ? 255 : (T)s;
+    uint32_t operator()(const uint32_t &v1, const uint32_t &v2) const {
+        const uint32_t SAT_VAL24 = (1 << 24) - 1;
+/*
+        uint32_t res;
+        if(SAT_VAL24 - v1 < v2) {
+            res = SAT_VAL24;
+        } else {
+            res = v1 + v2;
+        }
+        return res;
+*/
+        uint32_t s = v1 + v2;
+        return (s > SAT_VAL24) ? SAT_VAL24 : s;
     }
 };
 
-void histoGold(uint32_t* vals, const uint32_t N, const uint32_t H, uint8_t* histo) {
+void histoGold(uint32_t* vals, const uint32_t N, const uint32_t H, uint32_t* histo) {
   SatAdd satadd;
   for(uint32_t i = 0; i < H; i++) {
     histo[i] = 0;
   }
   for(int i = 0; i < N; i++) {
     uint32_t ind = vals[i];
-    histo[ind]  = satadd(histo[ind], (uint8_t)1);
+    histo[ind]  = satadd(histo[ind], (uint32_t)1);
   }
 }
 
-double sortRedByKeyCUB( uint32_t* data_keys_in, uint8_t* histo
+double sortRedByKeyCUB( uint32_t* data_keys_in, uint32_t* histo
                       , const uint32_t N, const uint32_t H
 ) {
     uint32_t* data_keys_out;
-    uint8_t * data_vals;
+    uint32_t* data_vals;
     uint32_t* unique_keys;
     uint32_t* num_segments;
+
+    int beg_bit = 0;
+    int end_bit = ceilLog2(H);
 
     { // allocating stuff
         cudaMalloc ((void**) &data_keys_out, N * sizeof(uint32_t));
         cudaMalloc ((void**) &unique_keys,   H * sizeof(uint32_t));
         cudaMalloc ((void**) &num_segments,  sizeof(uint32_t));
-        cudaMalloc ((void**) &data_vals,     N * sizeof(uint8_t));
-        cudaMemset(data_vals, 1, N);
+        cudaMalloc ((void**) &data_vals,     N * sizeof(uint32_t));
+        { // setting data_vals to ones
+            const int block = 256;
+            const int grid  = (N + block - 1) / block;
+            setOnesKernel<<<grid, block>>>(data_vals, N);
+        }
     }
 
     void * tmp_sort_mem = NULL;
@@ -64,7 +89,7 @@ double sortRedByKeyCUB( uint32_t* data_keys_in, uint8_t* histo
     { // sort prelude
         cub::DeviceRadixSort::SortKeys( tmp_sort_mem, tmp_sort_len
                                       , data_keys_in, data_keys_out
-                                      , (int)N
+                                      , (int)N,   beg_bit,  end_bit
                                       );
         cudaMalloc(&tmp_sort_mem, tmp_sort_len);
     }
@@ -87,7 +112,7 @@ double sortRedByKeyCUB( uint32_t* data_keys_in, uint8_t* histo
     { // one dry run
         cub::DeviceRadixSort::SortKeys( tmp_sort_mem, tmp_sort_len
                                       , data_keys_in, data_keys_out
-                                      , (int)N
+                                      , (int)N,   beg_bit,  end_bit
                                       );
         cub::DeviceReduce::ReduceByKey( tmp_red_mem, tmp_red_len
                                       , data_keys_out, unique_keys
@@ -119,7 +144,7 @@ double sortRedByKeyCUB( uint32_t* data_keys_in, uint8_t* histo
 #endif
         cub::DeviceRadixSort::SortKeys( tmp_sort_mem, tmp_sort_len
                                       , data_keys_in, data_keys_out
-                                      , (int)N
+                                      , (int)N,   beg_bit,  end_bit
                                       );
         cub::DeviceReduce::ReduceByKey( tmp_red_mem, tmp_red_len
                                       , data_keys_out, unique_keys
@@ -155,9 +180,9 @@ int main (int argc, char * argv[]) {
     printf("Computing for image size: %d and histogram size: %d\n", N, H);
 
     //Allocate and Initialize Host data with random values
-    uint32_t* h_keys  = (uint32_t*)malloc(N*sizeof(uint32_t));
-    uint8_t * h_histo = (uint8_t*) malloc(H*sizeof(uint8_t ));
-    uint8_t * g_histo = (uint8_t*) malloc(H*sizeof(uint8_t ));
+    uint32_t* h_keys  = (uint32_t*) malloc(N*sizeof(uint32_t));
+    uint32_t* h_histo = (uint32_t*) malloc(H*sizeof(uint32_t ));
+    uint32_t* g_histo = (uint32_t*) malloc(H*sizeof(uint32_t ));
     randomInitNat(h_keys, N, H);
 
     { // golden sequential histogram
@@ -170,27 +195,27 @@ int main (int argc, char * argv[]) {
         gettimeofday(&t_end, NULL);
         timeval_subtract(&t_diff, &t_end, &t_start);
         elapsed = (t_diff.tv_sec*1e6+t_diff.tv_usec); 
-        printf("Golden (Sequential) Uint8-Saturated-Add Histogram runs in: %.2f microsecs\n", elapsed);
+        printf("Golden (Sequential) Uint24-Saturated-Add Histogram runs in: %.2f microsecs\n", elapsed);
     }
 
     //Allocate and Initialize Device data
     uint32_t* d_keys;
-    uint8_t*  d_histo;
+    uint32_t* d_histo;
     cudaSucceeded(cudaMalloc((void**) &d_keys,  N * sizeof(uint32_t)));
-    cudaSucceeded(cudaMalloc((void**) &d_histo, H * sizeof(uint8_t)));
+    cudaSucceeded(cudaMalloc((void**) &d_histo, H * sizeof(uint32_t)));
     cudaSucceeded(cudaMemcpy(d_keys, h_keys, N * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
     double elapsed = sortRedByKeyCUB( d_keys, d_histo, N, H );
 
-    cudaMemcpy(h_histo, d_histo, H*sizeof(uint8_t), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_histo, d_histo, H*sizeof(uint32_t), cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
     cudaCheckError();
-    printf("CUB Uint8-Saturated-Add Histogram ... ");
-    bool success = validateZ<uint8_t>(g_histo, h_histo, H);
+    printf("CUB Uint24-Saturated-Add Histogram ... ");
+    bool success = validateZ<uint32_t>(g_histo, h_histo, H);
 
-    printf("CUB Uint8-Saturated-Add Histogram runs in: %.2f microsecs\n", elapsed);
-    double gigaBytesPerSec = N * (sizeof(uint32_t) + 2*sizeof(uint8_t)) * 1.0e-3f / elapsed; 
-    printf("CUB Uint8-Saturated-Add Histogram GBytes/sec = %.2f!\n", gigaBytesPerSec); 
+    printf("CUB Uint24-Saturated-Add Histogram runs in: %.2f microsecs\n", elapsed);
+    double gigaBytesPerSec = N * (sizeof(uint32_t) + 2*sizeof(uint32_t)) * 1.0e-3f / elapsed; 
+    printf("CUB Uint24-Saturated-Add Histogram GBytes/sec = %.2f!\n", gigaBytesPerSec); 
 
     // Cleanup and closing
     cudaFree(d_keys); cudaFree(d_histo);
