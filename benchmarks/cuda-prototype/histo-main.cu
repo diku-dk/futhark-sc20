@@ -21,7 +21,7 @@
 #define GLB_K_MIN   2
 
 #ifndef RACE_FACT
-#define RACE_FACT   32 //32  // = H / (Num_Distinct_Pts)
+#define RACE_FACT   64 //32  // = H / (Num_Distinct_Pts)
 #endif
 
 #ifndef STRIDE
@@ -35,15 +35,9 @@
 
 #if 1
   #define CTGRACE     0
-  #define RACE_EXPNS MAX(1.0, RF * (((float)RACE_FACT)/CLelmsz) * ( (CLelmsz>STRIDE) ? (CLelmsz/STRIDE) : 1 ) )
 #else
   #define CTGRACE     1
   #define SHRINK_FACT (0.75*RACE_FACT) //0.625
-  #if CTGRACE
-    #define RACE_EXPNS  MAX(1.0, SHRINK_FACT)
-  #else
-    #define RACE_EXPNS  MAX(1.0, SHRINK_FACT / 16)
-  #endif
 #endif
 
 #define BLOCK       1024
@@ -97,92 +91,19 @@ void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, in
     *num_chunks = (H + len - 1) / len;
 }
 
-
-
-void autoLocSubHistoDeg0(const AtomicPrim prim_kind, const int H, const int N, int* M, int* num_chunks) {
-    const int lmem = LOCMEMW_PERTHD * BLOCK * 4;
-    const int elms_per_block = (N + BLOCK - 1) / BLOCK;
-    const int el_size_tot = (prim_kind == XCHG)? 3*sizeof(int) : sizeof(int);
-    const int el_size = (prim_kind == XCHG)? 2*sizeof(int) : sizeof(int);
-
-    float m     = MIN( (lmem*1.0 / el_size)    , (float)elms_per_block ) / H;
-    float m_tot = MIN( (lmem*1.0 / el_size_tot), (float)elms_per_block ) / H;
-
-    if (prim_kind == ADD) {
-        *M = max(1, min( (int)floor(m), BLOCK ) );
-    } else {
-        m = max(1.0, m);
-        const float c = BLOCK / m;
-        const float RFC = MIN( (float)RACE_FACT, 32.0*pow(RACE_FACT/32.0, 0.33) );
-        float tmp1 = c*RFC / (m * H);
-        if (m_tot / m > tmp1) {
-            *M = min( (int)MAX(floor(m_tot), 1.0), BLOCK );
-        } else {
-            float tmp = (prim_kind==CAS) ? ceil(tmp1) : floor(tmp1);
-            float f = MAX( 1.0, tmp );
-            *M = min( (int) floor(m*f), BLOCK);
-        }
-        printf("In computeLocM: prim-kind %d, H %d, result f: %f, m: %f, M: %d\n"
-              , prim_kind, H, tmp1, m, *M);
-    }
-    const int len = lmem / (el_size_tot * (*M));
-    *num_chunks = (H + len - 1) / len;
-
-
-    // cooperation level can be define independently as
-    //     C = min(H/k, B) for some smallish k, or
-    // derived from M as
-    //     C = ceil(BLOCK/M)
-    //const int coop = (BLOCK + m - 1) / m;
-    //printf("COOP LEVEL: %d, subhistogram degree: %d\n", coop, m);
-    //return min(m, BLOCK);
-}
-
-int autoGlbSubHistoDeg(
-                const AtomicPrim prim_kind, const int H, const int N, const int T, const int L2
-) {
-    const int el_size = (prim_kind == XCHG)? 3*sizeof(int) : sizeof(int);
-    const float frac  = L2Fract * RACE_EXPNS;
-    const float k_max = MIN( frac * (L2 / el_size) / T, ((float)N)/T );
-    const float coop_h = (prim_kind == ADD) ? (2.0*H) / k_max : (1.0*H) / k_max; 
-    const float coop  = MIN( (float)T, coop_h );
-    return max(1, (int) (T / coop));
-}
-
-void autoGlbChunksSubhists0(
-                const AtomicPrim prim_kind, const int H, const int N, const int T, const int L2,
-                int* M, int* num_chunks ) {
-    const int el_size = (prim_kind == XCHG)?
-                        3*sizeof(int) : sizeof(int);
-    
-    const float  optim_k_min = GLB_K_MIN;
-    const float  coop  = MIN( (float)T, H/optim_k_min );
-    const int    Mdeg  = max(1, (int) (T / coop));
-    const size_t totsz = Mdeg * H;
-    const size_t L2csz = L2Fract * (L2 / el_size) * RACE_EXPNS;
-    const int num_chks = (totsz + L2csz - 1) / L2csz;
-    const int Hnew     = (H + num_chks - 1) / num_chks;
-
-    *num_chunks = num_chks;
-    *M = autoGlbSubHistoDeg(prim_kind, Hnew, N, T, L2);
-
-    printf( "CHUNKING branch: optim_k_min: %f, coop: %f, Mdeg: %d, Hold: %d, Hnew: %d, num_chunks: %d, M: %d\n"
-          , optim_k_min, coop, Mdeg, H, Hnew, *num_chunks, *M );
-}
-
 void autoGlbChunksSubhists(
                 const AtomicPrim prim_kind, const int H, const int N, const int T, const int L2,
                 int* M, int* num_chunks ) {
-    // For the computation of beta on XCHG:
+    // For the computation of avg_size on XCHG:
     //   In principle we average the size of the lock and of the element-type of histogram
     //   But Futhark uses a tuple-of-array rep: hence we need to average the lock together
     //     with each element type from the tuple.
-    const int   beta    = (prim_kind == XCHG)? 3*sizeof(int)/2 : sizeof(int);
+    const int   avg_size= (prim_kind == XCHG)? 3*sizeof(int)/2 : sizeof(int);
     const int   el_size = (prim_kind == XCHG)? 3*sizeof(int) : sizeof(int);
     const float optim_k_min = GLB_K_MIN;
         
     // first part
-    float race_exp = max(1.0, (1.0 * RF * RACE_FACT) / ( (4.0*CLelmsz) / beta) );
+    float race_exp = max(1.0, (1.0 * RF * RACE_FACT) / ( (4.0*CLelmsz) / avg_size) );
     float coop_min = MIN( (float)T, H/optim_k_min );
     const int Mdeg  = max(1, (int) (T / coop_min));
     *num_chunks = (int)ceil( Mdeg*H / ( L2Fract * ((1.0*L2Cache) / el_size) * race_exp ) );
@@ -346,8 +267,8 @@ void runGlobalMemDataset(int* h_input, uint32_t* h_histo, int* d_input) {
         }
     }
 
-    printf("Running Histo in Global Mem: RACE_FACT: %d, STRIDE: %d, RACE_EXPNS: %f, L2Cache:%d, L2Fract: %f\n",
-           RACE_FACT, STRIDE, RACE_EXPNS, L2Cache, L2Fract);
+    printf("Running Histo in Global Mem: RACE_FACT: %d, STRIDE: %d, L2Cache:%d, L2Fract: %f\n",
+           RACE_FACT, STRIDE, L2Cache, L2Fract);
 
     //printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RACE_FACT);
     printLaTex<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RACE_FACT);
@@ -393,7 +314,7 @@ int main() {
     cudaMalloc((void**) &d_input, mem_size_input);
     cudaMemcpy(d_input, h_input, mem_size_input, cudaMemcpyHostToDevice);
 
-#if 0
+#if 1
     runLocalMemDataset(h_input, h_histo, d_input);
 #endif
 
