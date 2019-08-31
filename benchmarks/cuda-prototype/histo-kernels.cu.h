@@ -51,7 +51,7 @@ atomADD(volatile uint32_t* loc_hists, volatile int* locks, int idx, uint32_t v) 
 /*******************************************************************/
 __device__ __host__ inline static uint32_t
 satadd(uint32_t v1, uint32_t v2) {
-    const uint32_t SAT_VAL32 = 4294967295;
+    const uint32_t SAT_VAL24 = (1 << 24) - 1;
     uint32_t res;
     if(SAT_VAL32 - v1 < v2) {
         res = SAT_VAL32;
