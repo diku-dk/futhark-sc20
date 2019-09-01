@@ -8,7 +8,7 @@
 #define MIN(a,b)    (((a) < (b)) ? (a) : (b))
 #define MAX(a,b)    (((a) < (b)) ? (b) : (a)) 
 
-#define GPU_KIND    2 // 1 -> RTX2080Ti; 2 -> GTX1050Ti
+#define GPU_KIND    1 // 1 -> RTX2080Ti; 2 -> GTX1050Ti
 
 #if (GPU_KIND==1)
     #define MF 5632
@@ -41,7 +41,7 @@
 #endif
 
 #define BLOCK       1024
-#define GPU_RUNS    3//50
+#define GPU_RUNS    50
 #define CPU_RUNS    1
 
 #define INP_LEN     50000000
