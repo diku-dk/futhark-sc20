@@ -41,7 +41,7 @@
 #endif
 
 #define BLOCK       1024
-#define GPU_RUNS    1//50
+#define GPU_RUNS    3//50
 #define CPU_RUNS    1
 
 #define INP_LEN     50000000
@@ -314,7 +314,7 @@ int main() {
     cudaMalloc((void**) &d_input, mem_size_input);
     cudaMemcpy(d_input, h_input, mem_size_input, cudaMemcpyHostToDevice);
  
-#if 1
+#if 0
     runLocalMemDataset(h_input, h_histo, d_input);
 #endif
 
