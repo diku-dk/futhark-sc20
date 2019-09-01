@@ -16,26 +16,6 @@ struct indval {
   T value;
 };
 
-template<AtomicPrim primKind, class T>
-__device__ __host__ inline
-struct indval<T>
-f(int pixel, uint32_t his_sz) {
-  const uint32_t ratio = max(1, his_sz/RACE_FACT);
-  struct indval<T> iv;
-  const uint32_t contraction = (((uint32_t)pixel) % ratio);
-#if (CTGRACE || (STRIDE==1) || (RACE_FACT==1))
-  iv.index = contraction;
-#else
-  iv.index = contraction * RACE_FACT;
-#endif
-  if(primKind == CAS) {
-    iv.value = 1;
-  } else {
-    iv.value = (T)pixel;
-  }
-  return iv;
-}
-
 
 /**************************************************/
 /*** The three primitives for atomic update     ***/
@@ -137,6 +117,28 @@ atomXCGglb(volatile uint64_t* glb_hists, volatile int* loc_locks, uint32_t idx, 
     }
 }
 /////////////////////////////////////////////////////////////////
+
+template<AtomicPrim primKind, class T>
+__device__ __host__ inline
+struct indval<T>
+f(int pixel, uint32_t his_sz) {
+  const uint32_t ratio = max(1, his_sz/RACE_FACT);
+  struct indval<T> iv;
+  const uint32_t contraction = (((uint32_t)pixel) % ratio);
+#if (CTGRACE || (STRIDE==1) || (RACE_FACT==1))
+  iv.index = contraction;
+#else
+  iv.index = contraction * RACE_FACT;
+#endif
+  if(primKind == CAS) {
+    iv.value = 1;
+  } else if(primKind == XCHG) {
+    iv.value = pack64( (uint32_t)pixel/64, (uint32_t)pixel );
+  } else {
+    iv.value = (T)pixel;
+  }
+  return iv;
+}
 
 // compile-time selector of atomic-update primitive
 template<AtomicPrim primKind, MemoryType memKind, class BETA> __device__ inline void
