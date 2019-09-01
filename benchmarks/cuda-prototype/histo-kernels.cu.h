@@ -122,13 +122,13 @@ template<AtomicPrim primKind, class T>
 __device__ __host__ inline
 struct indval<T>
 f(int pixel, uint32_t his_sz) {
-  const uint32_t ratio = max(1, his_sz/RACE_FACT);
+  const uint32_t ratio = max(1, his_sz/RF);
   struct indval<T> iv;
   const uint32_t contraction = (((uint32_t)pixel) % ratio);
-#if (CTGRACE || (STRIDE==1) || (RACE_FACT==1))
+#if (CTGRACE || (STRIDE==1) || (RF==1))
   iv.index = contraction;
 #else
-  iv.index = contraction * RACE_FACT;
+  iv.index = contraction * STRIDE; // RF;
 #endif
   if(primKind == CAS) {
     iv.value = 1;

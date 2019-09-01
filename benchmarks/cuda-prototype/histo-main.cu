@@ -8,20 +8,20 @@
 #define MIN(a,b)    (((a) < (b)) ? (a) : (b))
 #define MAX(a,b)    (((a) < (b)) ? (b) : (a)) 
 
-#define GPU_KIND    1 // 1 -> RTX2080Ti; 2 -> GTX1050Ti
+#define GPU_KIND    2 // 1 -> RTX2080Ti; 2 -> GTX1050Ti
 
 #if (GPU_KIND==1)
     #define MF 5632
-    #define RF 0.75
+    #define K_RF 0.75
 #else // GPU_KIND==2
     #define MF 1024
-    #define RF 0.5
+    #define K_RF 0.5
 #endif
 
 #define GLB_K_MIN   2
 
-#ifndef RACE_FACT
-#define RACE_FACT   64 //32  // = H / (Num_Distinct_Pts)
+#ifndef RF
+#define RF   64 //32  // = H / (Num_Distinct_Pts)
 #endif
 
 #ifndef STRIDE
@@ -37,11 +37,11 @@
   #define CTGRACE     0
 #else
   #define CTGRACE     1
-  #define SHRINK_FACT (0.75*RACE_FACT) //0.625
+  #define SHRINK_FACT (0.75*RF) //0.625
 #endif
 
 #define BLOCK       1024
-#define GPU_RUNS    50
+#define GPU_RUNS    1//50
 #define CPU_RUNS    1
 
 #define INP_LEN     50000000
@@ -78,7 +78,7 @@ void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, in
         *M = max(1, min( (int)floor(m_prime), BLOCK ) );
     } else {
         float m = max(1.0, m_prime);
-        const float RFC = MIN( (float)RACE_FACT, 32.0*pow(RACE_FACT/32.0, 0.33) );
+        const float RFC = MIN( (float)RF, 32.0*pow(RF/32.0, 0.33) );
         float f_prime = (BLOCK*RFC) / (m*m*H);
         float f_lower = (prim_kind==CAS) ? ceil(f_prime) : floor(f_prime);
         const int  f  = max(1, (int)f_lower);
@@ -103,7 +103,7 @@ void autoGlbChunksSubhists(
     const float optim_k_min = GLB_K_MIN;
         
     // first part
-    float race_exp = max(1.0, (1.0 * RF * RACE_FACT) / ( (4.0*CLelmsz) / avg_size) );
+    float race_exp = max(1.0, (1.0 * K_RF * RF) / ( (4.0*CLelmsz) / avg_size) );
     float coop_min = MIN( (float)T, H/optim_k_min );
     const int Mdeg  = max(1, (int) (T / coop_min));
     *num_chunks = (int)ceil( Mdeg*H / ( L2Fract * ((1.0*L2Cache) / el_size) * race_exp ) );
@@ -192,8 +192,8 @@ void runLocalMemDataset(int* h_input, uint32_t* h_histo, int* d_input) {
 
     }
 
-    //printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, ks, RACE_FACT);
-    printLaTex<num_histos,num_m_degs>  (runtimes, histo_sizes, ks, RACE_FACT);
+    //printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, ks, RF);
+    printLaTex<num_histos,num_m_degs>  (runtimes, histo_sizes, ks, RF);
 }
 
 
@@ -268,10 +268,10 @@ void runGlobalMemDataset(int* h_input, uint32_t* h_histo, int* d_input) {
     }
 
     printf("Running Histo in Global Mem: RACE_FACT: %d, STRIDE: %d, L2Cache:%d, L2Fract: %f\n",
-           RACE_FACT, STRIDE, L2Cache, L2Fract);
+           RF, STRIDE, L2Cache, L2Fract);
 
-    //printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RACE_FACT);
-    printLaTex<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RACE_FACT);
+    //printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RF);
+    printLaTex<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RF);
 }
 
 /////////////////////////////////////////////////////////

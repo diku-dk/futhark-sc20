@@ -141,6 +141,20 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
               (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, (uint64_t*)d_histos);
         }
       }
+      { // reduce across histograms and copy to host
+        const size_t B = 256;
+        const size_t num_blocks_red = (H + B - 1) / B;
+        if(select == ADD) {
+            naive_atmadd_reduce_kernel<<< num_blocks_red, B >>>
+                (d_histos, d_histo, H, num_blocks);   // histos_per_block*
+        } else if (select == CAS) {
+            naive_satadd_reduce_kernel<<< num_blocks_red, B >>>
+                (d_histos, d_histo, H, num_blocks);
+        } else {
+            naive_argmin_reduce_kernel<<< num_blocks_red, B >>>
+                ((uint64_t*)d_histos, (uint64_t*)d_histo, H, num_blocks);
+        }
+      }
     }
     cudaThreadSynchronize();
     gpuAssert( cudaPeekAtLastError() );
@@ -171,15 +185,16 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
         }
       }
       { // reduce across histograms and copy to host
-        const size_t num_blocks_red = (H + BLOCK - 1) / BLOCK;
+        const size_t B = 256;
+        const size_t num_blocks_red = (H + B - 1) / B;
         if(select == ADD) {
-            naive_atmadd_reduce_kernel<<< num_blocks_red, BLOCK >>>
+            naive_atmadd_reduce_kernel<<< num_blocks_red, B >>>
                 (d_histos, d_histo, H, num_blocks);   // histos_per_block*
         } else if (select == CAS) {
-            naive_satadd_reduce_kernel<<< num_blocks_red, BLOCK >>>
+            naive_satadd_reduce_kernel<<< num_blocks_red, B >>>
                 (d_histos, d_histo, H, num_blocks);
         } else {
-            naive_argmin_reduce_kernel<<< num_blocks_red, BLOCK >>>
+            naive_argmin_reduce_kernel<<< num_blocks_red, B >>>
                 ((uint64_t*)d_histos, (uint64_t*)d_histo, H, num_blocks);
         }
       }

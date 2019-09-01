@@ -15,15 +15,15 @@ run: $(PROGRAM)
 	./$(PROGRAM)
 
 race-1: histo-main.cu histo-wrap.cu.h histo-kernels.cu.h
-	$(COMPILER) $(OPT_FLAGS) -D RACE_FACT=1 -o $(PROGRAM) histo-main.cu
+	$(COMPILER) $(OPT_FLAGS) -D RF=1 -o $(PROGRAM) histo-main.cu
 	./$(PROGRAM)
 
 race-10: histo-main.cu histo-wrap.cu.h histo-kernels.cu.h
-	$(COMPILER) $(OPT_FLAGS) -D RACE_FACT=10 -o $(PROGRAM) histo-main.cu
+	$(COMPILER) $(OPT_FLAGS) -D RF=10 -o $(PROGRAM) histo-main.cu
 	./$(PROGRAM)
 
 race-30: histo-main.cu histo-wrap.cu.h histo-kernels.cu.h
-	$(COMPILER) $(OPT_FLAGS) -D RACE_FACT=30 -o $(PROGRAM) histo-main.cu
+	$(COMPILER) $(OPT_FLAGS) -D RF=30 -o $(PROGRAM) histo-main.cu
 	./$(PROGRAM)
 
 clean:
