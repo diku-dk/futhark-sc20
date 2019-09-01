@@ -128,7 +128,7 @@ f(int pixel, uint32_t his_sz) {
 #if (CTGRACE || (STRIDE==1) || (RF==1))
   iv.index = contraction;
 #else
-  iv.index = contraction * STRIDE; // RF;
+  iv.index = contraction * RF; // RF;
 #endif
   if(primKind == CAS) {
     iv.value = 1;
