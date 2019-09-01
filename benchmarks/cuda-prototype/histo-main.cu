@@ -313,7 +313,7 @@ int main() {
     int* d_input;
     cudaMalloc((void**) &d_input, mem_size_input);
     cudaMemcpy(d_input, h_input, mem_size_input, cudaMemcpyHostToDevice);
-
+ 
 #if 1
     runLocalMemDataset(h_input, h_histo, d_input);
 #endif
