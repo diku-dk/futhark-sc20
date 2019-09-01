@@ -80,9 +80,7 @@ uint64_t argmin(uint64_t v1, uint64_t v2) {
     uint32_t ind, val;
     if (arg1.value < arg2.value) {
         ind = arg2.index; val = arg2.value;
-    } else if (arg1.value > arg2.value) {
-        ind = arg1.index; val = arg2.value;
-    } else { // arg1.value == arg2.value
+    } else {
         ind = min(arg1.index, arg2.index);
         val = arg1.value;
     }
@@ -133,7 +131,7 @@ f(int pixel, uint32_t his_sz) {
   if(primKind == CAS) {
     iv.value = 1;
   } else if(primKind == XCHG) {
-    iv.value = pack64( (uint32_t)pixel/64, (uint32_t)pixel );
+    iv.value = pack64( (uint32_t)pixel/4, (uint32_t)pixel );
   } else {
     iv.value = (T)pixel;
   }
