@@ -41,7 +41,7 @@
 #endif
 
 #define BLOCK       1024
-#define GPU_RUNS    1 //50
+#define GPU_RUNS    50
 #define CPU_RUNS    1
 
 #define INP_LEN     50000000
