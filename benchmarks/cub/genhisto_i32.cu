@@ -95,12 +95,12 @@ int main (int argc, char * argv[]) {
                                            , d_data, d_histo, H+1, (uint32_t)0
                                            , H, (int32_t)N );
     }
+    cudaDeviceSynchronize();
 
     gettimeofday(&t_end, NULL);
     timeval_subtract(&t_diff, &t_end, &t_start);
     elapsed = (t_diff.tv_sec*1e6+t_diff.tv_usec) / ((double)GPU_RUNS);
 
-    cudaDeviceSynchronize();
     cudaCheckError();
 
     cudaSucceeded(cudaMemcpy (h_histo, d_histo, H*sizeof(uint32_t), cudaMemcpyDeviceToHost));
