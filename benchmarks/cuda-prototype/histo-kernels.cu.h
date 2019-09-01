@@ -208,7 +208,6 @@ locMemHwdAddCoopKernel( const int N, const int H, const int M
     const unsigned int gid = blockIdx.x * blockDim.x + tid;
     const unsigned int Hchunk = chunk_end - chunk_beg;
     unsigned int his_block_sz = M * Hchunk;
-    int ghid = blockIdx.x * M * H;
     volatile BETA* loc_hists = (__shared__ volatile BETA*) loc_mem;
     volatile int* loc_locks  = (primKind != XCHG) ? NULL : (loc_mem + 2*his_block_sz);
 
@@ -240,11 +239,21 @@ locMemHwdAddCoopKernel( const int N, const int H, const int M
     }
     __syncthreads();
 
-    // copy local histograms to global memory
-    for(int i=tid; i<his_block_sz; i+=blockDim.x) {
-        const int hist_ind =  i / Hchunk;
-        const int indH = (i % Hchunk) + chunk_beg;
-        histos[ghid + hist_ind*H + indH] = loc_hists[i];
+    // naive reduction of the histograms of the current block
+    unsigned int upbd = M*Hchunk;
+    for(int i = tid; i < Hchunk; i+=blockDim.x) {
+        BETA acc = loc_hists[i];
+        for(int j=Hchunk; j<upbd; j+=Hchunk) {
+            BETA cur = loc_hists[i+j];
+            if(primKind == ADD) {
+                acc = acc + cur;
+            } else if (primKind == CAS) {
+                acc = satadd(acc, cur);
+            } else { // primKind == XCHG
+                acc = argmin(acc, cur);
+            }
+        }
+        histos[blockIdx.x * H + chunk_beg + i] = acc;
     }
 }
 

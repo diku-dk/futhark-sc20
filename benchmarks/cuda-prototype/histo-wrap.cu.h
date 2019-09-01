@@ -119,7 +119,7 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
 
     const size_t K = (select == XCHG) ? 2 : 1;
     const size_t mem_size_histo  = H * K * sizeof(int);
-    const size_t mem_size_histos = histos_per_block * num_blocks * mem_size_histo;
+    const size_t mem_size_histos = num_blocks * mem_size_histo;   // histos_per_block * 
     uint32_t* d_histos;
     uint32_t* d_histo;
     uint32_t* h_histo = (uint32_t*)malloc(mem_size_histo);
@@ -149,8 +149,6 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
     cudaMemset(d_histo , 0, mem_size_histo );
 
     const int num_gpu_runs = GPU_RUNS;
-                             //(((select==XCHG) || (select==CAS)) && (histos_per_block==1)) ?
-                             //max(1, GPU_RUNS/25) : GPU_RUNS;
 
     unsigned long int elapsed;
     struct timeval t_start, t_end, t_diff;
@@ -172,6 +170,19 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
               (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, (uint64_t*)d_histos);
         }
       }
+      { // reduce across histograms and copy to host
+        const size_t num_blocks_red = (H + BLOCK - 1) / BLOCK;
+        if(select == ADD) {
+            naive_atmadd_reduce_kernel<<< num_blocks_red, BLOCK >>>
+                (d_histos, d_histo, H, num_blocks);   // histos_per_block*
+        } else if (select == CAS) {
+            naive_satadd_reduce_kernel<<< num_blocks_red, BLOCK >>>
+                (d_histos, d_histo, H, num_blocks);
+        } else {
+            naive_argmin_reduce_kernel<<< num_blocks_red, BLOCK >>>
+                ((uint64_t*)d_histos, (uint64_t*)d_histo, H, num_blocks);
+        }
+      }
     }
     cudaThreadSynchronize();
 
@@ -180,20 +191,7 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
     elapsed = (t_diff.tv_sec*1e6+t_diff.tv_usec);
     gpuAssert( cudaPeekAtLastError() );
 
-    { // reduce across histograms and copy to host
-        const size_t num_blocks_red = (H + BLOCK - 1) / BLOCK;
-        if(select == ADD) {
-            naive_atmadd_reduce_kernel<<< num_blocks_red, BLOCK >>>
-                (d_histos, d_histo, H, histos_per_block*num_blocks);
-        } else if (select == CAS) {
-            naive_satadd_reduce_kernel<<< num_blocks_red, BLOCK >>>
-                (d_histos, d_histo, H, histos_per_block*num_blocks);
-        } else {
-            naive_argmin_reduce_kernel<<< num_blocks_red, BLOCK >>>
-                ((uint64_t*)d_histos, (uint64_t*)d_histo, H, histos_per_block*num_blocks);
-        }
-        cudaMemcpy(h_histo, d_histo, mem_size_histo, cudaMemcpyDeviceToHost);
-    }
+    cudaMemcpy(h_histo, d_histo, mem_size_histo, cudaMemcpyDeviceToHost);
 
     { // validate and free memory
         bool is_valid;
@@ -266,6 +264,22 @@ glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int B, const
         } else { // select == XCHG
           glbMemHwdAddCoopKernel<XCHG,uint64_t><<< num_blocks, B >>>
               (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, (uint64_t*)d_histos, d_locks);
+        }
+      }
+      // reduce across subhistograms
+      {
+        // the line below seems wrong anyways!
+        // naive_reduce_kernel<<< (H+B-1) / B, BLOCK >>>(d_histos, d_histo, H, M);
+        const size_t num_blocks_red = (H + B - 1) / B;
+        if(select == ADD) {
+            naive_atmadd_reduce_kernel<<< num_blocks_red, B >>>
+                (d_histos, d_histo, H, M);
+        } else if (select == CAS) {
+            naive_satadd_reduce_kernel<<< num_blocks_red, B >>>
+                (d_histos, d_histo, H, M);
+        } else {
+            naive_argmin_reduce_kernel<<< num_blocks_red, B >>>
+                ((uint64_t*)d_histos, (uint64_t*)d_histo, H, M);
         }
       }
     }
