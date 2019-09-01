@@ -291,7 +291,7 @@ glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int B, const
 
     for(int q=0; q<num_gpu_runs; q++) {
       cudaMemset(d_histos, 0, mem_size_histos);
-      cudaMemset(d_locks,  0, mem_size_locks );
+
       for(int k=0; k<num_chunks; k++) {
         if(select == ADD) {
           glbMemHwdAddCoopKernel<ADD, uint32_t><<< num_blocks, B >>>
