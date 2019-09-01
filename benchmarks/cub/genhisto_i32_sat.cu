@@ -28,8 +28,6 @@ void randomInitNat(uint32_t* data, const uint32_t size, const uint32_t H) {
     }
 }
 
-#define GPU_RUNS    50
-
 struct SatAdd
 {
     __device__ CUB_RUNTIME_FUNCTION __forceinline__

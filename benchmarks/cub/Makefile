@@ -1,7 +1,7 @@
 CXX        = nvcc -O3
 CUB?="../../../cub-1.8.0/cub"
 
-EXECUTABLES=genhisto_i32 genhisto_i32_sat genhisto_f64
+EXECUTABLES=genhisto_i32 genhisto_i32_sat genhisto_f64 genhisto_argmin
 
 all: $(EXECUTABLES)
 

@@ -7,6 +7,8 @@
 #include <sys/time.h>
 #include <time.h>
 
+#define GPU_RUNS    50
+
 int timeval_subtract(struct timeval *result, struct timeval *t2, struct timeval *t1)
 {
   unsigned int resolution=1000000;
