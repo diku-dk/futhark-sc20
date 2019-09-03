@@ -70,13 +70,16 @@ unsigned int BLOCK_SZ;
 void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, int* M, int* num_chunks) {
     const int lmem = LOCMEMW_PERTHD * BLOCK * 4;
     const int num_blocks = (NUM_THREADS(N) + BLOCK - 1) / BLOCK;
+    const int q_small = 2;
+    const int work_asymp_M_max = N / (q_small*num_blocks*H);
+
     const int elms_per_block = (N + num_blocks - 1) / num_blocks; //(N + BLOCK - 1) / BLOCK;
     const int el_size = (prim_kind == XCHG)? 3*sizeof(int) : sizeof(int);
     float m_prime = MIN( (lmem*1.0 / el_size), (float)elms_per_block ) / H;
 
     if (prim_kind == ADD) {
         *M = max(1, min( (int)floor(m_prime), BLOCK ) );
-        *M = min(*M, N / (2*num_blocks*H));
+        *M = min(*M, work_asymp_M_max);
     } else {
         float m = max(1.0, m_prime);
         const float RFC = MIN( (float)RF, 32.0*pow(RF/32.0, 0.33) );
@@ -84,7 +87,7 @@ void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, in
         float f_lower = (prim_kind==CAS) ? ceil(f_prime) : floor(f_prime);
         const int  f  = max(1, (int)f_lower);
         *M = max(1, min( (int)floor((prim_kind==CAS)? m*f : m_prime*f), BLOCK));
-        *M = min(*M, N / (2*num_blocks*H));
+        *M = min(*M, work_asymp_M_max);
 
         printf("In computeLocM: prim-kind %d, H %d, result f: %f, m: %f, M: %d\n"
               , prim_kind, H, f_prime, m, *M);
@@ -103,11 +106,13 @@ void autoGlbChunksSubhists(
     const int   avg_size= (prim_kind == XCHG)? 3*sizeof(int)/2 : sizeof(int);
     const int   el_size = (prim_kind == XCHG)? 3*sizeof(int) : sizeof(int);
     const float optim_k_min = GLB_K_MIN;
+    const int q_small = 2;
+    const int work_asymp_M_max = N / (q_small*H);
         
     // first part
     float race_exp = max(1.0, (1.0 * K_RF * RF) / ( (4.0*CLelmsz) / avg_size) );
     float coop_min = MIN( (float)T, H/optim_k_min );
-    const int Mdeg  = max(1, (int) (T / coop_min));
+    const int Mdeg  = min(work_asymp_M_max, max(1, (int) (T / coop_min)));
     *num_chunks = (int)ceil( Mdeg*H / ( L2Fract * ((1.0*L2Cache) / el_size) * race_exp ) );
     const int H_chk = (int)ceil( H / (*num_chunks) );
     //const int H_chk = ( L2Fract * ((1.0*L2Cache) / el_size) * race_exp ) / Mdeg;
@@ -316,11 +321,11 @@ int main() {
     cudaMalloc((void**) &d_input, mem_size_input);
     cudaMemcpy(d_input, h_input, mem_size_input, cudaMemcpyHostToDevice);
  
-#if 1
+#if 0
     runLocalMemDataset(h_input, h_histo, d_input);
 #endif
 
-#if 0
+#if 1
     runGlobalMemDataset(h_input, h_histo, d_input);
 #endif
     // 7. clean up memory
