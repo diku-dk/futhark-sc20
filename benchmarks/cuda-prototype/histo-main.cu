@@ -25,7 +25,7 @@
 #endif
 
 #ifndef STRIDE
-#define STRIDE      16  // = (Max_Ind_Pt - Min_Ind_Pt) / Num_Distinct_Pts
+#define STRIDE      64  // = (Max_Ind_Pt - Min_Ind_Pt) / Num_Distinct_Pts
 #endif
 
 #define CLelmsz     16 // how many elements fit on a L2 cache line
@@ -69,13 +69,14 @@ unsigned int BLOCK_SZ;
 
 void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, int* M, int* num_chunks) {
     const int lmem = LOCMEMW_PERTHD * BLOCK * 4;
-    const int elms_per_block = (N + BLOCK - 1) / BLOCK;
+    const int num_blocks = (NUM_THREADS(N) + BLOCK - 1) / BLOCK;
+    const int elms_per_block = (N + num_blocks - 1) / num_blocks; //(N + BLOCK - 1) / BLOCK;
     const int el_size = (prim_kind == XCHG)? 3*sizeof(int) : sizeof(int);
-
     float m_prime = MIN( (lmem*1.0 / el_size), (float)elms_per_block ) / H;
 
     if (prim_kind == ADD) {
         *M = max(1, min( (int)floor(m_prime), BLOCK ) );
+        *M = min(*M, N / (2*num_blocks*H));
     } else {
         float m = max(1.0, m_prime);
         const float RFC = MIN( (float)RF, 32.0*pow(RF/32.0, 0.33) );
@@ -83,6 +84,7 @@ void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int H, const int N, in
         float f_lower = (prim_kind==CAS) ? ceil(f_prime) : floor(f_prime);
         const int  f  = max(1, (int)f_lower);
         *M = max(1, min( (int)floor((prim_kind==CAS)? m*f : m_prime*f), BLOCK));
+        *M = min(*M, N / (2*num_blocks*H));
 
         printf("In computeLocM: prim-kind %d, H %d, result f: %f, m: %f, M: %d\n"
               , prim_kind, H, f_prime, m, *M);
@@ -314,11 +316,11 @@ int main() {
     cudaMalloc((void**) &d_input, mem_size_input);
     cudaMemcpy(d_input, h_input, mem_size_input, cudaMemcpyHostToDevice);
  
-#if 0
+#if 1
     runLocalMemDataset(h_input, h_histo, d_input);
 #endif
 
-#if 1
+#if 0
     runGlobalMemDataset(h_input, h_histo, d_input);
 #endif
     // 7. clean up memory
