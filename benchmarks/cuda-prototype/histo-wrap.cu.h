@@ -166,8 +166,8 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
     cudaThreadSynchronize();
     gpuAssert( cudaPeekAtLastError() );
 
-    cudaMemset(d_histos, 0, mem_size_histos);
-    cudaMemset(d_histo , 0, mem_size_histo );
+    //    cudaMemset(d_histos, 0, mem_size_histos);
+    //    cudaMemset(d_histo , 0, mem_size_histo );
 
     const int num_gpu_runs = GPU_RUNS;
 
@@ -176,6 +176,8 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
     gettimeofday(&t_start, NULL); 
 
     for(int q=0; q<num_gpu_runs; q++) {
+      cudaMemset(d_histos, 0, mem_size_histos);
+      cudaMemset(d_histo , 0, mem_size_histo );
       for(int k=0; k<num_chunks; k++) {
         const int chunkLB = k*Hchunk;
         const int chunkUB = min(H, (k+1)*Hchunk);
