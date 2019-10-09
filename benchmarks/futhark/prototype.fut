@@ -32,7 +32,7 @@ let sat_add_u24 (x: i32) (y: i32): i32 =
      then sat_val else x + y
 
 entry cas [n] (H: i32) (RF: i32) (vs: [n]i32) =
-  reduce_by_index (replicate H 0) sat_add_u24 0 (map (index H RF) (iota n)) (map (%((1<<24)-1)) vs)
+  reduce_by_index (replicate H 0) sat_add_u24 0 (map (index H RF) (iota n)) (map (%(1<<24)) vs)
 
 let argmax (i: i32, x: i32) (j: i32, y: i32): (i32, i32) =
   if x < y then (i, x)
