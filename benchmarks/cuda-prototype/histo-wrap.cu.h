@@ -17,6 +17,14 @@ void randomInit(int* data, int size) {
         data[i] = rand(); // (float)RAND_MAX;
 }
 
+void printInpArray(int* data, int size) {
+    printf("[");
+    if(size > 0) printf("%di32", data[0]);
+    for (int i = 1; i < size; ++i)
+        printf(", %d", data[i]);
+    printf("]");
+}
+
 template<class T>
 void zeroOut(T* data, int size) {
     for (int i = 0; i < size; ++i)
