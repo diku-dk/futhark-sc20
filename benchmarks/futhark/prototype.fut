@@ -63,7 +63,7 @@ let pack (i: i32, x: i32) : u64 =
 
 let argmax (a: u64) (b: u64): u64 =
   let (i, x) = unpack a
-  let (j, y) = unpack a
+  let (j, y) = unpack b
   in pack (if x < y then (i, x)
            else if y < x then (j, y)
            else if i < j then (i, x)
