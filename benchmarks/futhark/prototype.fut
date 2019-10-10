@@ -34,12 +34,6 @@ let sat_add_u24 (x: i32) (y: i32): i32 =
 entry cas [n] (H: i32) (RF: i32) (vs: [n]i32) =
   reduce_by_index (replicate H 0) sat_add_u24 0 (map (index H RF) (iota n)) (map (%(1<<24)) vs)
 
-let argmax (i: i32, x: i32) (j: i32, y: i32): (i32, i32) =
-  if x < y then (i, x)
-  else if y < x then (j, y)
-  else if i < j then (i, x)
-  else (j, y)
-
 -- ==
 -- entry: xcg
 --
@@ -61,8 +55,21 @@ let argmax (i: i32, x: i32) (j: i32, y: i32): (i32, i32) =
 -- compiled random input { 24575 64 [50000000]i32 [50000000]i32 } auto output
 -- compiled random input { 49151 64 [50000000]i32 [50000000]i32 } auto output
 
+let unpack (a: u64) : (i32, i32) =
+  (i32.u64 a, i32.u64 (a >> 32))
+
+let pack (i: i32, x: i32) : u64 =
+  u64.i32 i | (u64.i32 x << 32)
+
+let argmax (a: u64) (b: u64): u64 =
+  let (i, x) = unpack a
+  let (j, y) = unpack a
+  in pack (if x < y then (i, x)
+           else if y < x then (j, y)
+           else if i < j then (i, x)
+           else (j, y))
+
 entry xcg [n] (H: i32) (RF: i32) (vs_a: [n]i32) (vs_b: [n]i32) =
-  reduce_by_index (replicate H (i32.highest, i32.lowest))
-                  argmax (i32.highest, i32.lowest)
-                  (map (index H RF) (iota n)) (zip vs_a vs_b)
-  |> unzip
+  reduce_by_index (replicate H (pack (i32.highest, i32.lowest)))
+                  argmax (pack (i32.highest, i32.lowest))
+                  (map (index H RF) (iota n)) (map pack (zip vs_a vs_b))
