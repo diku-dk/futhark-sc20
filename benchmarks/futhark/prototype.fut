@@ -1,3 +1,6 @@
+let reduce_by_index_rf 'a [m] [n] (rf: i32) (dest : *[m]a) (f : a -> a -> a) (ne : a) (is : [n]i32) (as : [n]a) : *[m]a =
+  intrinsics.hist (rf, dest, f, ne, is, as)
+
 -- ==
 -- entry: hwd cas
 -- compiled random input { 25 1 [50000000]i32 } auto output
@@ -24,7 +27,7 @@ let index (H: i32) (RF: i32) (elm: i32) =
   (elm % i32.max 1 (H/RF))*RF
 
 entry hwd [n] (H: i32) (RF: i32) (vs: [n]i32) =
-  reduce_by_index (replicate H 0) (+) 0 (map (index H RF) (iota n)) vs
+  reduce_by_index_rf RF (replicate H 0) (+) 0 (map (index H RF) (iota n)) vs
 
 let sat_add_u24 (x: i32) (y: i32): i32 =
   let sat_val = (1 << 24) - 1
@@ -32,7 +35,7 @@ let sat_add_u24 (x: i32) (y: i32): i32 =
      then sat_val else x + y
 
 entry cas [n] (H: i32) (RF: i32) (vs: [n]i32) =
-  reduce_by_index (replicate H 0) sat_add_u24 0 (map (index H RF) (iota n)) (map (%(1<<24)) vs)
+  reduce_by_index_rf RF (replicate H 0) sat_add_u24 0 (map (index H RF) (iota n)) (map (%(1<<24)) vs)
 
 -- ==
 -- entry: xcg
@@ -70,6 +73,7 @@ let argmax (a: u64) (b: u64): u64 =
            else (j, y))
 
 entry xcg [n] (H: i32) (RF: i32) (vs_a: [n]i32) (vs_b: [n]i32) =
-  reduce_by_index (replicate H (pack (i32.highest, i32.lowest)))
-                  argmax (pack (i32.highest, i32.lowest))
-                  (map (index H RF) (iota n)) (map pack (zip vs_a vs_b))
+  reduce_by_index_rf RF
+                     (replicate H (pack (i32.highest, i32.lowest)))
+                     argmax (pack (i32.highest, i32.lowest))
+                     (map (index H RF) (iota n)) (map pack (zip vs_a vs_b))
