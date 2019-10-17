@@ -11,7 +11,7 @@
 #define GPU_KIND    1 // 1 -> RTX2080Ti; 2 -> GTX1050Ti
 
 #if (GPU_KIND==1)
-    #define MF 5632
+    #define MF 5632   // 4096 for RTX2070
     #define K_RF 0.75
 #else // GPU_KIND==2
     #define MF 1024
