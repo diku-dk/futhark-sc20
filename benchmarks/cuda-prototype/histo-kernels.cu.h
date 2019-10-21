@@ -131,7 +131,7 @@ f(int pixel, uint32_t his_sz) {
   iv.index = contraction * RF; // RF;
 #endif
   if(primKind == CAS) {
-    iv.value = 1;
+    iv.value = pixel % 4;
   } else if(primKind == XCHG) {
     iv.value = pack64( (uint32_t)pixel/64, (uint32_t)pixel );
   } else {
