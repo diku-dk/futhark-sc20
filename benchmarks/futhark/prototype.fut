@@ -76,4 +76,4 @@ entry xcg [n] (H: i32) (RF: i32) (vs_a: [n]i32) (vs_b: [n]i32) =
   reduce_by_index_rf RF
                      (replicate H (pack (i32.highest, i32.lowest)))
                      argmax (pack (i32.highest, i32.lowest))
-                     (map (index H RF) (iota n)) (map pack (zip vs_a vs_b))
+                     (map (index H RF) vs_a) (map pack (zip vs_a vs_b))
