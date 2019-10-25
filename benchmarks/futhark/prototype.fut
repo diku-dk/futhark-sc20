@@ -24,18 +24,18 @@ let reduce_by_index_rf 'a [m] [n] (rf: i32) (dest : *[m]a) (f : a -> a -> a) (ne
 let stride : i32 = 16
 
 let index (H: i32) (RF: i32) (elm: i32) =
-  (elm % i32.max 1 (H/RF))*RF
+  i32.u32 (u32.i32 elm %% u32.max 1 (u32.i32 (H/RF))) * RF
 
 entry hwd [n] (H: i32) (RF: i32) (vs: [n]i32) =
-  reduce_by_index_rf RF (replicate H 0) (+) 0 (map (index H RF) (iota n)) vs
+  reduce_by_index_rf RF (replicate H 0) (+) 0 (map (index H RF) vs) vs
 
 let sat_add_u24 (x: i32) (y: i32): i32 =
   let sat_val = (1 << 24) - 1
-  in if x + y > sat_val
+  in if sat_val - x < y
      then sat_val else x + y
 
 entry cas [n] (H: i32) (RF: i32) (vs: [n]i32) =
-  reduce_by_index_rf RF (replicate H 0) sat_add_u24 0 (map (index H RF) (iota n)) (map (%(1<<24)) vs)
+  reduce_by_index_rf RF (replicate H 0) sat_add_u24 0 (map (index H RF) vs) (map (%%4) vs)
 
 -- ==
 -- entry: xcg
