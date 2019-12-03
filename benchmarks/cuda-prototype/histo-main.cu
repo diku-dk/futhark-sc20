@@ -124,8 +124,8 @@ void autoGlbChunksSubhists(
     const float coop = MIN( T, (u * H_chk) / k_max );
     *M = max( 1, (int)floor(T/coop) );
      
-    printf( "CHUNKING branch: optim_k_min: %f, coop: %f, Mdeg: %d, Hold: %d, Hnew: %d, num_chunks: %d, M: %d\n"
-          , optim_k_min, coop_min, Mdeg, H, H_chk, *num_chunks, *M );
+    printf( "CHUNKING branch: race_exp: %f, optim_k_min: %f, k_max: %f, coop: %f, Mdeg: %d, Hold: %d, Hnew: %d, num_chunks: %d, M: %d\n"
+            , race_exp, optim_k_min, k_max, coop, Mdeg, H, H_chk, *num_chunks, *M );
 }
 
 
