@@ -171,7 +171,7 @@ locMemHwdAddCoop(AtomicPrim select, const int RF, const int N, const int H, cons
       // reduce across histograms
       reduceAcrossMultiHistos(select, H, num_blocks, 256, d_histos, d_histo);
     }
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
     gpuAssert( cudaPeekAtLastError() );
 
     //    cudaMemset(d_histos, 0, mem_size_histos);
@@ -204,7 +204,7 @@ locMemHwdAddCoop(AtomicPrim select, const int RF, const int N, const int H, cons
       // reduce across histograms
       reduceAcrossMultiHistos(select, H, num_blocks, 256, d_histos, d_histo);
     }
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
 
     gettimeofday(&t_end, NULL);
     timeval_subtract(&t_diff, &t_end, &t_start);
@@ -272,7 +272,7 @@ glbMemHwdAddCoop(AtomicPrim select, const int RF, const int N, const int H, cons
     cudaMemset(d_locks,  0, mem_size_locks );
     cudaMemset(d_histo,  0, mem_size_histo );
     cudaMemset(d_histos, 0, mem_size_histos);
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
 
     { // dry run
       for(int k=0; k<num_chunks; k++) {
@@ -290,7 +290,7 @@ glbMemHwdAddCoop(AtomicPrim select, const int RF, const int N, const int H, cons
       // reduce across subhistograms
       reduceAcrossMultiHistos(select, H, M, B, d_histos, d_histo);
     }
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
     gpuAssert( cudaPeekAtLastError() );
 
     const int num_gpu_runs = GPU_RUNS;
@@ -317,7 +317,7 @@ glbMemHwdAddCoop(AtomicPrim select, const int RF, const int N, const int H, cons
       // reduce across subhistograms
       reduceAcrossMultiHistos(select, H, M, B, d_histos, d_histo);
     }
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
 
     gettimeofday(&t_end, NULL);
     timeval_subtract(&t_diff, &t_end, &t_start);

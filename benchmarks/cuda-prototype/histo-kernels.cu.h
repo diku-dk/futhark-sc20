@@ -207,7 +207,7 @@ locMemHwdAddCoopKernel( const int RF, const int N, const int H, const int M
     const unsigned int gid = blockIdx.x * blockDim.x + tid;
     const unsigned int Hchunk = chunk_end - chunk_beg;
     unsigned int his_block_sz = M * Hchunk;
-    volatile BETA* loc_hists = (__shared__ volatile BETA*) loc_mem;
+    volatile BETA* loc_hists = (volatile BETA*) loc_mem;
     volatile int* loc_locks  = (primKind != XCHG) ? NULL : (loc_mem + 2*his_block_sz);
 
 #if STRIDED_MODE_LOC
