@@ -121,14 +121,14 @@ atomXCGglb(volatile uint64_t* glb_hists, volatile int* loc_locks, uint32_t idx, 
 template<AtomicPrim primKind, class T>
 __device__ __host__ inline
 struct indval<T>
-f(int pixel, uint32_t his_sz) {
-  const uint32_t ratio = max(1, his_sz/RF);
+f(int pixel, int RF, uint32_t H) {
+  const uint32_t ratio = max(1, H/RF);
   struct indval<T> iv;
   const uint32_t contraction = (((uint32_t)pixel) % ratio);
-#if (CTGRACE || (STRIDE==1) || (RF==1))
+#if (CTGRACE || (STRIDE==1))
   iv.index = contraction;
 #else
-  iv.index = contraction * RF; // RF;
+  iv.index = contraction * RF;
 #endif
   if(primKind == CAS) {
     iv.value = pixel % 4;
@@ -199,10 +199,9 @@ naive_argmin_reduce_kernel (uint64_t * d_his, uint64_t * d_res, int his_sz, int 
  */
 template<AtomicPrim primKind, class BETA>
 __global__ void
-locMemHwdAddCoopKernel( const int N, const int H, const int M
-                      , const int chunk_beg, const int chunk_end 
-                      , const int T, int* input,  BETA* histos
-) {
+locMemHwdAddCoopKernel( const int RF, const int N, const int H, const int M
+                      , const int chunk_beg, const int chunk_end
+                      , const int T, int* input,  BETA* histos) {
     extern __shared__ volatile int32_t loc_mem[];
     const unsigned int tid = threadIdx.x;
     const unsigned int gid = blockIdx.x * blockDim.x + tid;
@@ -230,7 +229,7 @@ locMemHwdAddCoopKernel( const int N, const int H, const int M
     //if(gid < T) 
     {
         for(int i=gid; i<N; i+=T) {
-          struct indval<BETA> iv = f<primKind,BETA>(input[i], H);
+          struct indval<BETA> iv = f<primKind,BETA>(input[i], RF, H);
           if (iv.index >= chunk_beg && iv.index < chunk_end)
             selectAtomicAdd<primKind, LOCMEM, BETA>
                 ( loc_hists, loc_locks
@@ -262,7 +261,8 @@ locMemHwdAddCoopKernel( const int N, const int H, const int M
 /**************************************************/
 template<AtomicPrim primKind, class BETA>
 __global__ void
-glbMemHwdAddCoopKernel( const int N, const int H,
+glbMemHwdAddCoopKernel( const int RF,
+                        const int N, const int H,
                         const int M, const int T,
                         const int chunk_beg, const int chunk_end,
                         int* input,
@@ -278,7 +278,7 @@ glbMemHwdAddCoopKernel( const int N, const int H,
 #endif
     // compute histograms; assumes histograms have been previously initialized
     for(int i=gid; i<N; i+=T) {
-        struct indval<BETA> iv = f<primKind,BETA>(input[i], H);
+        struct indval<BETA> iv = f<primKind,BETA>(input[i], RF, H);
         if (iv.index >= chunk_beg && iv.index < chunk_end)
             selectAtomicAdd<primKind, GLBMEM, BETA>(histos, locks, ghidx+iv.index, iv.value);
     }

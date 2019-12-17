@@ -12,7 +12,10 @@ $(PROGRAM): histo-main.cu histo-wrap.cu.h histo-kernels.cu.h
 all: $(PROGRAM)
 
 run: $(PROGRAM)
-	./$(PROGRAM)
+	./$(PROGRAM) local 1
+	./$(PROGRAM) global 1
+	./$(PROGRAM) local 64
+	./$(PROGRAM) global 64
 
 race-1: histo-main.cu histo-wrap.cu.h histo-kernels.cu.h
 	$(COMPILER) $(OPT_FLAGS) -D RF=1 -o $(PROGRAM) histo-main.cu

@@ -61,21 +61,21 @@ int gpuAssert(cudaError_t code) {
 /**********************************/
 /*** Golden Sequntial Histogram ***/
 /**********************************/
-void computeSeqIntAddHisto(const int N, const int H, int* input, uint32_t* histo) {
+void computeSeqIntAddHisto(const int RF, const int N, const int H, int* input, uint32_t* histo) {
     for(int i=0; i<N; i++) {
-        struct indval<uint32_t> iv = f<ADD,uint32_t>(input[i], H);
+        struct indval<uint32_t> iv = f<ADD,uint32_t>(input[i], RF, H);
         histo[iv.index] += iv.value;
     }
 }
-void computeSeqSatAddHisto(const int N, const int H, int* input, uint32_t* histo) {
+void computeSeqSatAddHisto(const int RF, const int N, const int H, int* input, uint32_t* histo) {
     for(int i=0; i<N; i++) {
-        struct indval<uint32_t> iv = f<CAS,uint32_t>(input[i], H);
+        struct indval<uint32_t> iv = f<CAS,uint32_t>(input[i], RF, H);
         histo[iv.index] = satadd(histo[iv.index], iv.value);
     }
 }
-void computeSeqArgMinHisto(const int N, const int H, int* input, uint64_t* histo) {
+void computeSeqArgMinHisto(const int RF, const int N, const int H, int* input, uint64_t* histo) {
     for(int i=0; i<N; i++) {
-        struct indval<uint64_t> iv = f<XCHG,uint64_t>(input[i], H);
+        struct indval<uint64_t> iv = f<XCHG,uint64_t>(input[i], RF, H);
         histo[iv.index] = argmin(histo[iv.index], iv.value);
     }
 }
@@ -83,7 +83,7 @@ void computeSeqArgMinHisto(const int N, const int H, int* input, uint64_t* histo
 
 template<AtomicPrim select>
 unsigned long
-goldSeqHisto(const int N, const int H, int* input, uint32_t* histo) {
+goldSeqHisto(const int RF, const int N, const int H, int* input, uint32_t* histo) {
     unsigned long int elapsed;
     struct timeval t_start, t_end, t_diff;
     gettimeofday(&t_start, NULL);
@@ -91,11 +91,11 @@ goldSeqHisto(const int N, const int H, int* input, uint32_t* histo) {
     for(int q=0; q<CPU_RUNS; q++) {
         zeroOut(histo, H);
         if (select == ADD) {
-            computeSeqIntAddHisto(N, H, input, histo);
+            computeSeqIntAddHisto(RF, N, H, input, histo);
         } else if (select == CAS) {
-            computeSeqSatAddHisto(N, H, input, histo);
+            computeSeqSatAddHisto(RF, N, H, input, histo);
         } else {  // select == XCHG
-            computeSeqArgMinHisto(N, H, input, (uint64_t*)histo);
+            computeSeqArgMinHisto(RF, N, H, input, (uint64_t*)histo);
         }
     }
 
@@ -129,7 +129,7 @@ reduceAcrossMultiHistos(AtomicPrim select, uint32_t H, uint32_t M, uint32_t B, u
 /*** Local-Memory Histograms ***/
 /*******************************/
 unsigned long
-locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_per_block
+locMemHwdAddCoop(AtomicPrim select, const int RF, const int N, const int H, const int histos_per_block
                 , const int num_chunks, int* d_input, uint32_t* h_ref_histo) {
     if(histos_per_block <= 0) {
         printf("Illegal subhistogram degree: %d, H:%d, XCG?=%d, EXITING!\n", histos_per_block, H, (select==XCHG));
@@ -159,13 +159,13 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
         const int chunkUB = min(H, (k+1)*Hchunk);
         if(select == ADD) {
           locMemHwdAddCoopKernel<ADD, uint32_t><<< num_blocks, BLOCK, shmem_size >>>
-              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
+              (RF, N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
         } else if (select == CAS){
           locMemHwdAddCoopKernel<CAS, uint32_t><<< num_blocks, BLOCK, shmem_size >>>
-              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
+              (RF, N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
         } else { // select == XCHG
           locMemHwdAddCoopKernel<XCHG,uint64_t><<< num_blocks, BLOCK, 3*shmem_size >>>
-              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, (uint64_t*)d_histos);
+              (RF, N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, (uint64_t*)d_histos);
         }
       }
       // reduce across histograms
@@ -192,13 +192,13 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
 
         if(select == ADD) {
           locMemHwdAddCoopKernel<ADD, uint32_t><<< num_blocks, BLOCK, shmem_size >>>
-              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
+              (RF, N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
         } else if (select == CAS){
           locMemHwdAddCoopKernel<CAS, uint32_t><<< num_blocks, BLOCK, shmem_size >>>
-              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
+              (RF, N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
         } else { // select == XCHG
           locMemHwdAddCoopKernel<XCHG,uint64_t><<< num_blocks, BLOCK, 3*shmem_size >>>
-              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, (uint64_t*)d_histos);
+              (RF, N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, (uint64_t*)d_histos);
         }
       }
       // reduce across histograms
@@ -240,7 +240,7 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
 /*** Global-Memory Histograms ***/
 /********************************/
 unsigned long
-glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int B, const int M, const int num_chunks, int* d_input, uint32_t* h_ref_histo) {
+glbMemHwdAddCoop(AtomicPrim select, const int RF, const int N, const int H, const int B, const int M, const int num_chunks, int* d_input, uint32_t* h_ref_histo) {
     const int T = NUM_THREADS(N);
     const int C = (T + M - 1) / M;
     const int chunk_size = (H + num_chunks - 1) / num_chunks;
@@ -278,13 +278,13 @@ glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int B, const
       for(int k=0; k<num_chunks; k++) {
         if(select == ADD) {
           glbMemHwdAddCoopKernel<ADD, uint32_t><<< num_blocks, B >>>
-              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
+              (RF, N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
         } else if (select == CAS){
           glbMemHwdAddCoopKernel<CAS, uint32_t><<< num_blocks, B >>>
-              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
+              (RF, N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
         } else { // select == XCHG
           glbMemHwdAddCoopKernel<XCHG,uint64_t><<< num_blocks, B >>>
-              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, (uint64_t*)d_histos, d_locks);
+              (RF, N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, (uint64_t*)d_histos, d_locks);
         }
       }
       // reduce across subhistograms
@@ -305,13 +305,13 @@ glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int B, const
       for(int k=0; k<num_chunks; k++) {
         if(select == ADD) {
           glbMemHwdAddCoopKernel<ADD, uint32_t><<< num_blocks, B >>>
-              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
+              (RF, N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
         } else if (select == CAS){
           glbMemHwdAddCoopKernel<CAS, uint32_t><<< num_blocks, B >>>
-              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
+              (RF, N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
         } else { // select == XCHG
           glbMemHwdAddCoopKernel<XCHG,uint64_t><<< num_blocks, B >>>
-              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, (uint64_t*)d_histos, d_locks);
+              (RF, N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, (uint64_t*)d_histos, d_locks);
         }
       }
       // reduce across subhistograms
