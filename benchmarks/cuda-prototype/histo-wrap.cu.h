@@ -32,7 +32,7 @@ void zeroOut(T* data, int size) {
 }
 
 bool validate32(uint32_t* A, uint32_t* B, unsigned int sizeAB) {
-    for(int i = 0; i < sizeAB; i++) {
+    for(unsigned int i = 0; i < sizeAB; i++) {
         if (A[i] != B[i]) {
             printf("INVALID RESULT %d %d %d\n", i, A[i], B[i]);
             return false;
@@ -42,7 +42,7 @@ bool validate32(uint32_t* A, uint32_t* B, unsigned int sizeAB) {
 }
 
 bool validate64(uint64_t* A, uint64_t* B, unsigned int sizeAB) {
-    for(int i = 0; i < sizeAB; i++) {
+    for(unsigned int i = 0; i < sizeAB; i++) {
         if (A[i] != B[i]) {
             printf("INVALID RESULT %d %llu %llu\n", i, A[i], B[i]);
             return false;

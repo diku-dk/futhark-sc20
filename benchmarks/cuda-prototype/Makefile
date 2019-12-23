@@ -1,5 +1,5 @@
 COMPILER?=nvcc
-OPT_FLAGS?=-O3
+CFLAGS?=-O3 --compiler-options=-Wall
 LDFLAGS?=-lOpenCL
 
 PROGRAM=genhisto
@@ -7,7 +7,7 @@ PROGRAM=genhisto
 .PHONY: clean all run
 
 $(PROGRAM): histo-main.cu histo-wrap.cu.h histo-kernels.cu.h
-	$(COMPILER) $(OPT_FLAGS) -o $(PROGRAM) histo-main.cu
+	$(COMPILER) $(CFLAGS) -o $(PROGRAM) histo-main.cu
 
 all: $(PROGRAM)
 
