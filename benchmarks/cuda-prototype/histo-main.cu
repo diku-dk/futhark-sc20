@@ -3,10 +3,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
-#include <time.h> 
+#include <time.h>
+#include <errno.h>
+#include <string.h>
 
 #define MIN(a,b)    (((a) < (b)) ? (a) : (b))
-#define MAX(a,b)    (((a) < (b)) ? (b) : (a)) 
+#define MAX(a,b)    (((a) < (b)) ? (b) : (a))
 
 #define GPU_KIND    1 // 1 -> RTX2080Ti; 2 -> GTX1050Ti
 
@@ -51,9 +53,6 @@
 #define LOCMEMW_PERTHD 12
 #endif
 
-
-
-cudaDeviceProp prop;
 unsigned int HWD;
 unsigned int SH_MEM_SZ;
 unsigned int BLOCK_SZ;
@@ -62,6 +61,133 @@ unsigned int BLOCK_SZ;
 
 #include "histo-kernels.cu.h"
 #include "histo-wrap.cu.h"
+
+/***********************/
+/*** Pretty printing ***/
+/***********************/
+
+#define RESET   "\033[0m"
+#define BLACK   "\033[30m"
+#define RED     "\033[31m"
+#define GREEN   "\033[32m"
+#define YELLOW  "\033[33m"
+#define BLUE    "\033[34m"
+#define MAGENTA "\033[35m"
+#define CYAN    "\033[36m"
+#define WHITE   "\033[37m"
+#define BOLD    "\033[1m"
+#define BOLDBLACK   "\033[1m\033[30m"
+#define BOLDRED     "\033[1m\033[31m"
+#define BOLDGREEN   "\033[1m\033[32m"
+#define BOLDYELLOW  "\033[1m\033[33m"
+#define BOLDBLUE    "\033[1m\033[34m"
+#define BOLDMAGENTA "\033[1m\033[35m"
+#define BOLDCYAN    "\033[1m\033[36m"
+#define BOLDWHITE   "\033[1m\033[37m"
+
+template<int num_histos, int num_m_degs>
+void printTextTab( const unsigned long runtimes[3][num_histos][num_m_degs]
+                 , const int histo_sizes[num_histos]
+                 , const int kms[num_m_degs]
+                 , const int RF) {
+    for(int k=0; k<3; k++) {
+        printf("\n\n");
+
+        printf(BOLD "%s, RF=%d\n" RESET,
+               k == 0 ? "HWD" :
+               k == 1 ? "CAS" :
+               "XCG",
+               RF);
+
+        for(int i = 0; i<num_histos; i++) {
+            printf(BOLD "\tH=%d" RESET, histo_sizes[i]);
+        }
+
+        printf("\n");
+
+        for(int j=0; j<num_m_degs; j++) {
+          if (j < num_m_degs-1) {
+              printf(BOLD "M=%d\t" RESET, kms[j]);
+          } else {
+              printf(BOLD "Ours\t" RESET);
+          }
+          for(int i = 0; i<num_histos; i++) {
+              printf("%lu\t", runtimes[k][i][j]);
+          }
+          printf("\n");
+        }
+    }
+}
+
+template<int num_histos, int num_m_degs>
+void printLaTex( const unsigned long runtimes[3][num_histos][num_m_degs]
+               , const int histo_sizes[num_histos]
+               , const int kms[num_m_degs]
+               , const int R) {
+    for(int k=0; k<3; k++) {
+        printf("\\begin{tabular}{|l|l|l|l|l|l|l|l|}\\hline\n");
+        if     (k==0) printf("ADD, R=%d", R);
+        else if(k==1) printf("CAS, R=%d", R);
+        else if(k==2) printf("XCG, R=%d", R);
+
+        for(int i = 0; i<num_histos; i++) { printf("\t& H=%d", histo_sizes[i]); }
+        printf("\\\\\\hline\n");
+        for(int j=0; j<num_m_degs; j++) {
+            if      (j==0)             printf("M=1 ");
+            else if (j < num_m_degs-1) printf("M=%d", kms[j]);
+            else                       printf("Ours");
+
+            for(int i = 0; i<num_histos; i++) {
+                printf("\t& %3.2f", runtimes[k][i][j]/1000.0);
+            }
+            printf("\\\\");
+            if(j == (num_m_degs-1)) printf("\\hline");
+            printf("\n");
+        }
+        printf("\\end{tabular}\n");
+    }
+}
+
+template<int num_histos, int num_m_degs>
+void printCSV(const char *csv, int k,
+              const unsigned long runtimes[3][num_histos][num_m_degs],
+              const int histo_sizes[num_histos],
+              const int kms[num_m_degs]) {
+
+    FILE* f = fopen(csv, "w");
+
+    if (f == NULL) {
+        fprintf(stderr, "Failed to open %s: %s\n", csv, strerror(errno));
+        return;
+    }
+
+    for(int i = 0; i<num_histos; i++) {
+        fprintf(f, "H=%d", histo_sizes[i]);
+        if (i != num_histos-1) {
+            fprintf(f, ",");
+        } else {
+            fprintf(f, "\n");
+        }
+    }
+
+    for(int j=0; j<num_m_degs; j++) {
+        if (j < num_m_degs-1) {
+            fprintf(f, "M=%d", kms[j]);
+        } else {
+            fprintf(f, "Ours");
+        }
+        for(int i = 0; i<num_histos; i++) {
+            fprintf(f, ",%lu", runtimes[k][i][j]);
+        }
+        fprintf(f, "\n");
+    }
+
+    fclose(f);
+}
+
+/****************/
+/*** The meat ***/
+/****************/
 
 void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int RF, const int H, const int N, int* M, int* num_chunks) {
     const int lmem = LOCMEMW_PERTHD * BLOCK * 4;
@@ -125,7 +251,8 @@ void autoGlbChunksSubhists(
 }
 
 
-void runLocalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, int RF, int N) {
+void runLocalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, int RF, int N,
+                        const char *hwd_csv, const char *cas_csv, const char *xcg_csv) {
     const int num_histos = 8;
     const int num_m_degs = 6;
     const int histo_sizes[num_histos] = {25, 121, 505, 2041, 6143, 12287, 24575, 49151};
@@ -195,12 +322,22 @@ void runLocalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, int RF, i
 
     }
 
-    //printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, ks, RF);
-    printLaTex<num_histos,num_m_degs>  (runtimes, histo_sizes, ks, RF);
+    printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, ks, RF);
+    //printLaTex<num_histos,num_m_degs>  (runtimes, histo_sizes, ks, RF);
+
+    if (hwd_csv) {
+        printCSV(hwd_csv, 0, runtimes, histo_sizes, ks);
+    }
+    if (cas_csv) {
+        printCSV(cas_csv, 0, runtimes, histo_sizes, ks);
+    }
+    if (xcg_csv) {
+        printCSV(xcg_csv, 0, runtimes, histo_sizes, ks);
+    }
 }
 
-
-void runGlobalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, const int RF, const int N) {
+void runGlobalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, const int RF, const int N,
+                        const char *hwd_csv, const char *cas_csv, const char *xch_csv) {
     const int B = 256;
     const int T = NUM_THREADS(N);
     const int num_histos = 7;
@@ -273,8 +410,8 @@ void runGlobalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, const in
     printf("Running Histo in Global Mem: RACE_FACT: %d, STRIDE: %d, L2Cache:%d, L2Fract: %f\n",
            RF, STRIDE, L2Cache, L2Fract);
 
-    //printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RF);
-    printLaTex<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RF);
+    printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RF);
+    //printLaTex<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RF);
 }
 
 void usage(const char *prog) {
@@ -286,7 +423,7 @@ void usage(const char *prog) {
 // Program main
 /////////////////////////////////////////////////////////
 int main(int argc, char **argv) {
-    if (argc != 3) {
+    if (argc != 3 && argc != 6) {
         usage(argv[0]);
     }
 
@@ -300,6 +437,15 @@ int main(int argc, char **argv) {
     }
 
     int RF = atoi(argv[2]);
+    const char *hwd_csv = NULL;
+    const char *cas_csv = NULL;
+    const char *xcg_csv = NULL;
+
+    if (argc == 6) {
+        hwd_csv = argv[3];
+        cas_csv = argv[4];
+        xcg_csv = argv[5];
+    }
 
     // set seed for rand()
     srand(2006);
@@ -307,7 +453,9 @@ int main(int argc, char **argv) {
     { // 0. querry the hardware
         int nDevices;
         cudaGetDeviceCount(&nDevices);
-  
+
+        cudaDeviceProp prop;
+
         cudaGetDeviceProperties(&prop, 0);
         HWD = prop.maxThreadsPerMultiProcessor * prop.multiProcessorCount;
         BLOCK_SZ = prop.maxThreadsPerBlock;
@@ -338,9 +486,11 @@ int main(int argc, char **argv) {
     cudaMemcpy(d_input, h_input, mem_size_input, cudaMemcpyHostToDevice);
  
     if (run_local) {
-        runLocalMemDataset(h_input, h_histo, d_input, RF, INP_LEN);
+        runLocalMemDataset(h_input, h_histo, d_input, RF, INP_LEN,
+                           hwd_csv, cas_csv, xcg_csv);
     } else {
-        runGlobalMemDataset(h_input, h_histo, d_input, RF, INP_LEN);
+        runGlobalMemDataset(h_input, h_histo, d_input, RF, INP_LEN,
+                            hwd_csv, cas_csv, xcg_csv);
     }
     // 7. clean up memory
     free(h_input);
