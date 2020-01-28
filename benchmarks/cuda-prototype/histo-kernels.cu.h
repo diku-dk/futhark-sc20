@@ -96,7 +96,9 @@ atomXCGloc(volatile uint64_t* loc_hists, volatile int* loc_locks, uint32_t idx, 
         if( atomicExch((int *)&loc_locks[idx], 1) == 0 ) {
             //loc_hists[idx] += v;
             loc_hists[idx] = argmin(loc_hists[idx], v);
-            atomicExch((int *)&loc_locks[idx], 0);
+            __threadfence();
+            loc_locks[idx] = 0;
+            //atomicExch((int *)&loc_locks[idx], 0);
             done = true;
         }
         __threadfence();

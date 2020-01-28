@@ -29,7 +29,7 @@ let reduce_by_index_rf 'a [m] [n] (rf: i32) (dest : *[m]a) (f : a -> a -> a) (ne
 -- compiled random input { 786431 64 [50000000]i32 } auto output
 -- compiled random input { 1572863 64 [50000000]i32 } auto output
 
-let stride : i32 = 16
+let stride : i32 = 64--16
 
 let index (H: i32) (RF: i32) (elm: i32) =
   i32.u32 (u32.i32 elm %% u32.max 1 (u32.i32 (H/RF))) * RF

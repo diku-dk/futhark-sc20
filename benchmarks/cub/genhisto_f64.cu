@@ -1,7 +1,6 @@
 #include "cub.cuh"   // or equivalently <cub/device/device_histogram.cuh>
 #include "helper.cu.h"
 
-#define GPU_RUNS    50
 #define real double
 
 

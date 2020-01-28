@@ -233,7 +233,7 @@ void runGlobalMemDataset(int* h_input, uint32_t* h_histo, int* d_input) {
                     num_chunks_add = 1; M_add = subhisto_degs[j];
                 }
                 if(j==(num_m_degs-1))
-                    printf("Our M_add: %d, num_chunks_cas: %d, for H: %d\n", M_add, num_chunks_add, H);
+                    printf("Our M_add: %d, num_chunks_add: %d, for H: %d\n", M_add, num_chunks_add, H);
 
                 runtimes[0][i][j] = glbMemHwdAddCoop(ADD,  INP_LEN, H, B, M_add, num_chunks_add, d_input, h_histo);
             }
@@ -305,7 +305,24 @@ int main() {
         }
     }
 
- 
+#if 0
+    {
+        int M, num_chunks;
+        autoLocSubHistoDeg(CAS, 24575, INP_LEN, &M, &num_chunks);
+        printf("For LocMem H=24575, RF:%d => M: %d, #chunks: %d\n", RF, M, num_chunks);
+        exit(1);
+    } 
+#endif
+
+#if 0
+    {
+        int M, num_chunks;
+        autoGlbChunksSubhists(CAS, 24575, INP_LEN, NUM_THREADS(INP_LEN), L2Cache, &M, &num_chunks);
+        printf("For GlbMem H=24575, RF:%d => M: %d, #chunks: %d\n", RF, M, num_chunks);
+        exit(1);
+    }
+#endif
+
     // 1. allocate host memory for input and histogram
     const unsigned int mem_size_input = sizeof(int) * INP_LEN;
     int* h_input = (int*) malloc(mem_size_input);
@@ -321,11 +338,11 @@ int main() {
     cudaMalloc((void**) &d_input, mem_size_input);
     cudaMemcpy(d_input, h_input, mem_size_input, cudaMemcpyHostToDevice);
  
-#if 0
+#if 1
     runLocalMemDataset(h_input, h_histo, d_input);
 #endif
 
-#if 1
+#if 0
     runGlobalMemDataset(h_input, h_histo, d_input);
 #endif
     // 7. clean up memory
