@@ -1,5 +1,5 @@
 let reduce_by_index_rf 'a [m] [n] (rf: i32) (dest : *[m]a) (f : a -> a -> a) (ne : a) (is : [n]i32) (as : [n]a) : *[m]a =
-  intrinsics.hist (rf, dest, f, ne, is, as)
+  intrinsics.hist (rf, dest, f, ne, is, as) : *[m]a
 
 -- ==
 -- entry: hwd cas

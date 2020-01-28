@@ -32,7 +32,7 @@ void zeroOut(T* data, int size) {
 }
 
 bool validate32(uint32_t* A, uint32_t* B, unsigned int sizeAB) {
-    for(int i = 0; i < sizeAB; i++) {
+    for(unsigned int i = 0; i < sizeAB; i++) {
         if (A[i] != B[i]) {
             printf("INVALID RESULT %d %d %d\n", i, A[i], B[i]);
             return false;
@@ -42,7 +42,7 @@ bool validate32(uint32_t* A, uint32_t* B, unsigned int sizeAB) {
 }
 
 bool validate64(uint64_t* A, uint64_t* B, unsigned int sizeAB) {
-    for(int i = 0; i < sizeAB; i++) {
+    for(unsigned int i = 0; i < sizeAB; i++) {
         if (A[i] != B[i]) {
             printf("INVALID RESULT %d %llu %llu\n", i, A[i], B[i]);
             return false;
@@ -61,21 +61,21 @@ int gpuAssert(cudaError_t code) {
 /**********************************/
 /*** Golden Sequntial Histogram ***/
 /**********************************/
-void computeSeqIntAddHisto(const int N, const int H, int* input, uint32_t* histo) {
+void computeSeqIntAddHisto(const int RF, const int N, const int H, int* input, uint32_t* histo) {
     for(int i=0; i<N; i++) {
-        struct indval<uint32_t> iv = f<ADD,uint32_t>(input[i], H);
+        struct indval<uint32_t> iv = f<ADD,uint32_t>(input[i], RF, H);
         histo[iv.index] += iv.value;
     }
 }
-void computeSeqSatAddHisto(const int N, const int H, int* input, uint32_t* histo) {
+void computeSeqSatAddHisto(const int RF, const int N, const int H, int* input, uint32_t* histo) {
     for(int i=0; i<N; i++) {
-        struct indval<uint32_t> iv = f<CAS,uint32_t>(input[i], H);
+        struct indval<uint32_t> iv = f<CAS,uint32_t>(input[i], RF, H);
         histo[iv.index] = satadd(histo[iv.index], iv.value);
     }
 }
-void computeSeqArgMinHisto(const int N, const int H, int* input, uint64_t* histo) {
+void computeSeqArgMinHisto(const int RF, const int N, const int H, int* input, uint64_t* histo) {
     for(int i=0; i<N; i++) {
-        struct indval<uint64_t> iv = f<XCHG,uint64_t>(input[i], H);
+        struct indval<uint64_t> iv = f<XCHG,uint64_t>(input[i], RF, H);
         histo[iv.index] = argmin(histo[iv.index], iv.value);
     }
 }
@@ -83,7 +83,7 @@ void computeSeqArgMinHisto(const int N, const int H, int* input, uint64_t* histo
 
 template<AtomicPrim select>
 unsigned long
-goldSeqHisto(const int N, const int H, int* input, uint32_t* histo) {
+goldSeqHisto(const int RF, const int N, const int H, int* input, uint32_t* histo) {
     unsigned long int elapsed;
     struct timeval t_start, t_end, t_diff;
     gettimeofday(&t_start, NULL);
@@ -91,11 +91,11 @@ goldSeqHisto(const int N, const int H, int* input, uint32_t* histo) {
     for(int q=0; q<CPU_RUNS; q++) {
         zeroOut(histo, H);
         if (select == ADD) {
-            computeSeqIntAddHisto(N, H, input, histo);
+            computeSeqIntAddHisto(RF, N, H, input, histo);
         } else if (select == CAS) {
-            computeSeqSatAddHisto(N, H, input, histo);
+            computeSeqSatAddHisto(RF, N, H, input, histo);
         } else {  // select == XCHG
-            computeSeqArgMinHisto(N, H, input, (uint64_t*)histo);
+            computeSeqArgMinHisto(RF, N, H, input, (uint64_t*)histo);
         }
     }
 
@@ -129,7 +129,7 @@ reduceAcrossMultiHistos(AtomicPrim select, uint32_t H, uint32_t M, uint32_t B, u
 /*** Local-Memory Histograms ***/
 /*******************************/
 unsigned long
-locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_per_block
+locMemHwdAddCoop(AtomicPrim select, const int RF, const int N, const int H, const int histos_per_block
                 , const int num_chunks, int* d_input, uint32_t* h_ref_histo) {
     if(histos_per_block <= 0) {
         printf("Illegal subhistogram degree: %d, H:%d, XCG?=%d, EXITING!\n", histos_per_block, H, (select==XCHG));
@@ -159,19 +159,19 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
         const int chunkUB = min(H, (k+1)*Hchunk);
         if(select == ADD) {
           locMemHwdAddCoopKernel<ADD, uint32_t><<< num_blocks, BLOCK, shmem_size >>>
-              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
+              (RF, N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
         } else if (select == CAS){
           locMemHwdAddCoopKernel<CAS, uint32_t><<< num_blocks, BLOCK, shmem_size >>>
-              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
+              (RF, N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
         } else { // select == XCHG
           locMemHwdAddCoopKernel<XCHG,uint64_t><<< num_blocks, BLOCK, 3*shmem_size >>>
-              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, (uint64_t*)d_histos);
+              (RF, N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, (uint64_t*)d_histos);
         }
       }
       // reduce across histograms
       reduceAcrossMultiHistos(select, H, num_blocks, 256, d_histos, d_histo);
     }
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
     gpuAssert( cudaPeekAtLastError() );
 
     //    cudaMemset(d_histos, 0, mem_size_histos);
@@ -192,19 +192,19 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
 
         if(select == ADD) {
           locMemHwdAddCoopKernel<ADD, uint32_t><<< num_blocks, BLOCK, shmem_size >>>
-              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
+              (RF, N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
         } else if (select == CAS){
           locMemHwdAddCoopKernel<CAS, uint32_t><<< num_blocks, BLOCK, shmem_size >>>
-              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
+              (RF, N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
         } else { // select == XCHG
           locMemHwdAddCoopKernel<XCHG,uint64_t><<< num_blocks, BLOCK, 3*shmem_size >>>
-              (N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, (uint64_t*)d_histos);
+              (RF, N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, (uint64_t*)d_histos);
         }
       }
       // reduce across histograms
       reduceAcrossMultiHistos(select, H, num_blocks, 256, d_histos, d_histo);
     }
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
 
     gettimeofday(&t_end, NULL);
     timeval_subtract(&t_diff, &t_end, &t_start);
@@ -240,7 +240,7 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
 /*** Global-Memory Histograms ***/
 /********************************/
 unsigned long
-glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int B, const int M, const int num_chunks, int* d_input, uint32_t* h_ref_histo) {
+glbMemHwdAddCoop(AtomicPrim select, const int RF, const int N, const int H, const int B, const int M, const int num_chunks, int* d_input, uint32_t* h_ref_histo) {
     const int T = NUM_THREADS(N);
     const int C = (T + M - 1) / M;
     const int chunk_size = (H + num_chunks - 1) / num_chunks;
@@ -272,25 +272,25 @@ glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int B, const
     cudaMemset(d_locks,  0, mem_size_locks );
     cudaMemset(d_histo,  0, mem_size_histo );
     cudaMemset(d_histos, 0, mem_size_histos);
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
 
     { // dry run
       for(int k=0; k<num_chunks; k++) {
         if(select == ADD) {
           glbMemHwdAddCoopKernel<ADD, uint32_t><<< num_blocks, B >>>
-              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
+              (RF, N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
         } else if (select == CAS){
           glbMemHwdAddCoopKernel<CAS, uint32_t><<< num_blocks, B >>>
-              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
+              (RF, N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
         } else { // select == XCHG
           glbMemHwdAddCoopKernel<XCHG,uint64_t><<< num_blocks, B >>>
-              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, (uint64_t*)d_histos, d_locks);
+              (RF, N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, (uint64_t*)d_histos, d_locks);
         }
       }
       // reduce across subhistograms
       reduceAcrossMultiHistos(select, H, M, B, d_histos, d_histo);
     }
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
     gpuAssert( cudaPeekAtLastError() );
 
     const int num_gpu_runs = GPU_RUNS;
@@ -305,19 +305,19 @@ glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int B, const
       for(int k=0; k<num_chunks; k++) {
         if(select == ADD) {
           glbMemHwdAddCoopKernel<ADD, uint32_t><<< num_blocks, B >>>
-              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
+              (RF, N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
         } else if (select == CAS){
           glbMemHwdAddCoopKernel<CAS, uint32_t><<< num_blocks, B >>>
-              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
+              (RF, N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
         } else { // select == XCHG
           glbMemHwdAddCoopKernel<XCHG,uint64_t><<< num_blocks, B >>>
-              (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, (uint64_t*)d_histos, d_locks);
+              (RF, N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, (uint64_t*)d_histos, d_locks);
         }
       }
       // reduce across subhistograms
       reduceAcrossMultiHistos(select, H, M, B, d_histos, d_histo);
     }
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
 
     gettimeofday(&t_end, NULL);
     timeval_subtract(&t_diff, &t_end, &t_start);
@@ -352,60 +352,4 @@ glbMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int B, const
     return (elapsed/num_gpu_runs);
 }
 
-/***********************/
-/*** Pretty printing ***/
-/***********************/
-template<int num_histos, int num_m_degs>
-void printTextTab( const unsigned long runtimes[3][num_histos][num_m_degs]
-                 , const int histo_sizes[num_histos]
-                 , const int kms[num_m_degs]
-                 , const int R
-) {
-    for(int k=0; k<3; k++) {
-        if     (k==0) printf("ADD, R=%d\t", R);
-        else if(k==1) printf("CAS, R=%d\t", R);
-        else if(k==2) printf("XCG, R=%d\t", R);
-
-        for(int i = 0; i<num_histos; i++) { printf("H=%d\t", histo_sizes[i]); }
-        printf("\n");
-        for(int j=0; j<num_m_degs; j++) {
-            if      (j==0)             printf("M=1 \t");
-            else if (j < num_m_degs-1) printf("M=%d\t", kms[j]);
-            else                       printf("Ours\t");
-            for(int i = 0; i<num_histos; i++) {
-                printf("%lu\t", runtimes[k][i][j]);
-            }
-            printf("\n");
-        }
-        printf("\n");
-    }
-}
-template<int num_histos, int num_m_degs>
-void printLaTex( const unsigned long runtimes[3][num_histos][num_m_degs]
-               , const int histo_sizes[num_histos]
-               , const int kms[num_m_degs]
-               , const int R) {
-    for(int k=0; k<3; k++) {
-        printf("\\begin{tabular}{|l|l|l|l|l|l|l|l|}\\hline\n");
-        if     (k==0) printf("ADD, R=%d", R);
-        else if(k==1) printf("CAS, R=%d", R);
-        else if(k==2) printf("XCG, R=%d", R);
-
-        for(int i = 0; i<num_histos; i++) { printf("\t& H=%d", histo_sizes[i]); }
-        printf("\\\\\\hline\n");
-        for(int j=0; j<num_m_degs; j++) {
-            if      (j==0)             printf("M=1 ");
-            else if (j < num_m_degs-1) printf("M=%d", kms[j]);
-            else                       printf("Ours");
-            
-            for(int i = 0; i<num_histos; i++) {
-                printf("\t& %3.2f", runtimes[k][i][j]/1000.0);
-            }
-            printf("\\\\");
-            if(j == (num_m_degs-1)) printf("\\hline");
-            printf("\n");
-        }
-        printf("\\end{tabular}\n");
-    }
-}
 #endif // HISTO_WRAPPER
