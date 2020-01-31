@@ -152,7 +152,8 @@ template<int num_histos, int num_m_degs>
 void printCSV(const char *csv, int k,
               const unsigned long runtimes[3][num_histos][num_m_degs],
               const int histo_sizes[num_histos],
-              const int kms[num_m_degs]) {
+              const int kms[num_m_degs],
+              const char *mstr) {
 
     FILE* f = fopen(csv, "w");
 
@@ -161,8 +162,9 @@ void printCSV(const char *csv, int k,
         return;
     }
 
+    fprintf(f, "M,");
     for(int i = 0; i<num_histos; i++) {
-        fprintf(f, "H=%d", histo_sizes[i]);
+        fprintf(f, "%d", histo_sizes[i]);
         if (i != num_histos-1) {
             fprintf(f, ",");
         } else {
@@ -172,7 +174,7 @@ void printCSV(const char *csv, int k,
 
     for(int j=0; j<num_m_degs; j++) {
         if (j < num_m_degs-1) {
-            fprintf(f, "M=%d", kms[j]);
+            fprintf(f, "%s%d", mstr, kms[j]);
         } else {
             fprintf(f, "Ours");
         }
@@ -326,18 +328,18 @@ void runLocalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, int RF, i
     //printLaTex<num_histos,num_m_degs>  (runtimes, histo_sizes, ks, RF);
 
     if (hwd_csv) {
-        printCSV(hwd_csv, 0, runtimes, histo_sizes, ks);
+        printCSV(hwd_csv, 0, runtimes, histo_sizes, ks, "_");
     }
     if (cas_csv) {
-        printCSV(cas_csv, 0, runtimes, histo_sizes, ks);
+        printCSV(cas_csv, 1, runtimes, histo_sizes, ks, "_");
     }
     if (xcg_csv) {
-        printCSV(xcg_csv, 0, runtimes, histo_sizes, ks);
+        printCSV(xcg_csv, 2, runtimes, histo_sizes, ks, "_");
     }
 }
 
 void runGlobalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, const int RF, const int N,
-                        const char *hwd_csv, const char *cas_csv, const char *xch_csv) {
+                        const char *hwd_csv, const char *cas_csv, const char *xcg_csv) {
     const int B = 256;
     const int T = NUM_THREADS(N);
     const int num_histos = 7;
@@ -412,6 +414,16 @@ void runGlobalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, const in
 
     printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RF);
     //printLaTex<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RF);
+
+    if (hwd_csv) {
+        printCSV(hwd_csv, 0, runtimes, histo_sizes, subhisto_degs, "=");
+    }
+    if (cas_csv) {
+        printCSV(cas_csv, 1, runtimes, histo_sizes, subhisto_degs, "=");
+    }
+    if (xcg_csv) {
+        printCSV(xcg_csv, 2, runtimes, histo_sizes, subhisto_degs, "=");
+    }
 }
 
 void usage(const char *prog) {
