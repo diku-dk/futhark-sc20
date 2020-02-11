@@ -127,7 +127,7 @@ f(int pixel, int RF, uint32_t H) {
   const uint32_t ratio = max(1, H/RF);
   struct indval<T> iv;
   const uint32_t contraction = (((uint32_t)pixel) % ratio);
-#if (CTGRACE || (STRIDE==1))
+#if 0 //(CTGRACE || (STRIDE==1))
   iv.index = contraction;
 #else
   iv.index = contraction * RF;
@@ -230,7 +230,11 @@ locMemHwdAddCoopKernel( const int RF, const int N, const int H, const int M
     // compute local histograms
     //if(gid < T) 
     {
-        for(int i=gid; i<N; i+=T) {
+        // Need to normalize the loop below so one can unroll
+        //for(int i=gid; i<N; i+=T) {
+        int loop_count = (N - gid + T - 1) / T;
+        for(int k=0; k<loop_count; k++) {
+          int i = gid + k*T;
           struct indval<BETA> iv = f<primKind,BETA>(input[i], RF, H);
           if (iv.index >= chunk_beg && iv.index < chunk_end)
             selectAtomicAdd<primKind, LOCMEM, BETA>
