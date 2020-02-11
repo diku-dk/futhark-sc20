@@ -13,7 +13,7 @@
 #define GPU_KIND    1 // 1 -> RTX2080Ti; 2 -> GTX1050Ti
 
 #if (GPU_KIND==1)
-    #define MF 5632   // 4096 for RTX2070
+    #define MF 4096   // 4096 for RTX2070, 5632 for RTX2080
     #define K_RF 0.75
 #else // GPU_KIND==2
     #define MF 1024
@@ -39,7 +39,7 @@
 #endif
 
 #define BLOCK       1024
-#define GPU_RUNS    50
+#define GPU_RUNS    100
 #define CPU_RUNS    1
 
 #define INP_LEN     50000000
@@ -257,7 +257,7 @@ void runLocalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, int RF, i
                         const char *hwd_csv, const char *cas_csv, const char *xcg_csv) {
     const int num_histos = 8;
     const int num_m_degs = 6;
-    const int histo_sizes[num_histos] = {25, 121, 505, 2041, 6143, 12287, 24575, 49151};
+    const int histo_sizes[num_histos] = {25, 121, 505, 2041, 6141, 12281, 24569, 49145};
                                         //{/*25, 121, 505, 1024-7,*/ 2048-7, 4089, 6143, 12287, 24575, 49151};
                                         //{ 25, 57, 121, 249, 505, 1024-7, 4096-7, 12288-1, 24575, 4*12*1024-1 };
                                         //{ 64, 128, 256, 512 };
@@ -324,8 +324,8 @@ void runLocalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, int RF, i
 
     }
 
-    printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, ks, RF);
-    //printLaTex<num_histos,num_m_degs>  (runtimes, histo_sizes, ks, RF);
+    //printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, ks, RF);
+    printLaTex<num_histos,num_m_degs>  (runtimes, histo_sizes, ks, RF);
 
     if (hwd_csv) {
         printCSV(hwd_csv, 0, runtimes, histo_sizes, ks, "_");
@@ -345,9 +345,8 @@ void runGlobalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, const in
     const int num_histos = 7;
     const int num_m_degs = 6;
     const int algn = 1;
-    const int histo_sizes[num_histos] = { 1*12*1024-algn,  2*12*1024-algn,  4*12*1024-algn
-                                        , 16*12*1024-algn, 32*12*1024-algn
-                                        , 64*12*1024-algn, 128*12*1024-algn };
+    const int histo_sizes[num_histos] = { 12281,  24569,  49145
+                                        , 196607, 393215, 786431, 1572863 };
                                         //{ 1*12*1024-algn,  2*12*1024-algn,  4*12*1024-algn
                                         //, 8*12*1024-algn, 16*12*1024-algn, 32*12*1024-algn
                                         //, 64*12*1024-algn, 128*12*1024-algn };
@@ -412,8 +411,8 @@ void runGlobalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, const in
     printf("Running Histo in Global Mem: RACE_FACT: %d, STRIDE: %d, L2Cache:%d, L2Fract: %f\n",
            RF, STRIDE, L2Cache, L2Fract);
 
-    printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RF);
-    //printLaTex<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RF);
+    //printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RF);
+    printLaTex<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RF);
 
     if (hwd_csv) {
         printCSV(hwd_csv, 0, runtimes, histo_sizes, subhisto_degs, "=");
