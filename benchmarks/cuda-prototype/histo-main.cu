@@ -237,7 +237,10 @@ void autoGlbChunksSubhists(
     float race_exp = max(1.0, (1.0 * K_RF * RF) / ( (4.0*CLelmsz) / avg_size) );
     float coop_min = MIN( (float)T, H/optim_k_min );
     const int Mdeg  = min(work_asymp_M_max, max(1, (int) (T / coop_min)));
-    *num_chunks = (int)ceil( Mdeg*H / ( L2Fract * ((1.0*L2Cache) / el_size) * race_exp ) );
+    //*num_chunks = (int)ceil( Mdeg*H / ( L2Fract * ((1.0*L2Cache) / el_size) * race_exp ) );
+    const int S_nom = Mdeg*H*avg_size; //el_size;  // diference: Futhark using avg_size instead of `el_size` here, and seems to do better!
+    const int S_den = (int) (L2Fract * L2Cache * race_exp);
+    *num_chunks = (S_nom + S_den - 1) / S_den;
     const int H_chk = (int)ceil( H / (*num_chunks) );
     //const int H_chk = ( L2Fract * ((1.0*L2Cache) / el_size) * race_exp ) / Mdeg;
     //*num_chunks = (H + H_chk - 1) / H_chk;
