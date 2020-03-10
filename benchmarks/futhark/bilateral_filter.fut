@@ -5,10 +5,11 @@
 let tile [n][m] 'a (bn: i32) (bm: i32) (xss: [n][m]a): [][][]a =
   let tiles_per_n = n / bn
   let tiles_per_m = m / bm
+  let bnbm = bn*bm
   let mk_tile bx by =
-    tabulate (bn*bm) (\i -> let x = bx * bn + (i / bn)
-                            let y = by * bm + (i % bn)
-                            in unsafe xss[x, y])
+    tabulate bnbm (\i -> let x = bx * bn + (i / bn)
+                         let y = by * bm + (i % bn)
+                         in unsafe xss[x, y])
   in tabulate_2d tiles_per_n tiles_per_m mk_tile
 
 let bilateral_grid [nx][ny] (s_sigma: f32) (r_sigma: f32) (I: [nx][ny]f32) : [][][](f32,i32) =
@@ -34,15 +35,15 @@ let fivepoint [n] 'a (op: a -> a -> a) (scale: a -> f32 -> a) (xs: [n]a) =
                        scale (pick i) 6 `op`
                        scale (pick (i+1)) 4 `op` pick (i+2))
 
-let lerp (v0, v1, t) =
-  v0 + (v1-v0)*f32.max 0 (f32.min 1 t)
+let lerp (v0, v1, t) = f32.lerp v0 v1 t
 
 let shape_3d [n][m][k] 't (_: [n][m][k]t) = (n, m, k)
 
 entry bilateral_filter [n][m] (s_sigma: i32) (r_sigma: f32) (I: [n][m]f32) =
   let grid = bilateral_grid (r32 s_sigma) r_sigma I
-  let smoothen' = map (map (fivepoint (\(x1,y1) (x2,y2) -> (x1+x2, y1+y2))
-                                      (\(x, y) c -> (x * c, y * t32 c))))
+  let smoothen' xs = map (map (fivepoint (\(x1,y1) (x2,y2) -> (x1+x2, y1+y2))
+                                         (\(x, y) c -> (x * c, y * t32 c))))
+                         xs
   let blurz = smoothen' grid
   let blurx = blurz |>
               transpose |>
@@ -75,5 +76,5 @@ entry bilateral_filter [n][m] (s_sigma: i32) (r_sigma: f32) (I: [n][m]f32) =
 
 
   in map2 (map2 (/))
-          (tabulate_2d n m (sample blury (.1)))
-          (tabulate_2d n m (sample blury ((.2) >-> r32)))
+          (tabulate_2d n m (sample blury (.0)))
+          (tabulate_2d n m (sample blury ((.1) >-> r32)))
