@@ -39,7 +39,7 @@
 #endif
 
 #define TEST_IS_POW2 1
-#define NRUNS   100
+#define NRUNS   1000
 
 #ifdef THRUST
 #define ENABLE_THRUST   1   // Enable thrust-based version also (xform-sort_by_key-reduce_by_key)
