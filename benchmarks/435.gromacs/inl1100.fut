@@ -1,3 +1,10 @@
+-- ==
+-- entry: main
+--
+-- compiled input @ data/all-largest.in
+-- output @ data/all-largest.out
+
+
 -------------------------------------------------------------
 --   * This is gromacs innerloop inl1100
 --   * Forces:      Calculated
@@ -35,16 +42,29 @@ let one     =  1.0f32
 let six     =  6.0f32
 let twelve  = 12.0f32
 
-entry main (nri: i32) (iinr: []i32) (jindex: []i32) (jjnr: []i32) (shift: []i32)
-           (shiftvec: []real) (pos: []real) (faction: *[]real) (charge: []real)
-           (facel: real) (types: []i32) (ntype: i32) (nbfp: []real) : *[]real =
+
+-- ntype 19, types \in [0..18]
+-- shiftvec: [3*23]f32
+-- num_particles = 23178
+-- pos     : [3*num_particles]real
+-- faction : [3*num_particles]real
+-- charge  : [num_particles]real
+-- nbfp : [2*ntype*ntype]
+entry main  [nri] [nrip1] [nrj] [num_particles]
+            (jindex: [nrip1]i32) (iinr: [nri]i32) (jjnr: [nrj]i32)
+            (shift: [nri]i32) (types: [num_particles]i32) 
+            (ntype: i32) (facel: real)
+            (shiftvec: []real) (pos: []real) (faction: *[]real)
+            (charge: []real) (nbfp: []real) 
+        = --: *[]real =
 
   -- building helper structures for flattening!
   let inner_lens = map (\i -> jindex[i+1] - jindex[i]) (iota nri)
-  let B = map (\i -> if i==0 then 0i32 else inner_lens[i-1]) (iota nri)
-       |> scan (+) 0i32
-  let len_flat = B[nri-1] + inner_lens[nri-1]
-  let tmp = map2 (\s b -> if s == 0 then -1 else b) inner_lens B
+  --let B = map (\i -> if i==0 then 0i32 else inner_lens[i-1]) (iota nri)
+  --     |> scan (+) 0i32
+  let B = jindex[:nri]
+  let len_flat = jindex[nri]
+  let tmp = map2 (\s b -> if s <= 0 then -1 else b) inner_lens B
   let flag= scatter (replicate len_flat 0i32) tmp (replicate nri 1)
   let out_inds = map (\i -> if i==0 then 0 else flag[i]) (iota len_flat)
               |> scan (+) 0i32
@@ -59,7 +79,7 @@ entry main (nri: i32) (iinr: []i32) (jindex: []i32) (jjnr: []i32) (shift: []i32)
             let shZ               = shiftvec[is3+2]  -- temporary
             let ii                = iinr[n]          -- temporary
             let ii3               = 3*ii             -- cheap to recompute 3*ii
-            --let nj0               = jindex[n]        -- already in jindex
+            --let nj0               = jindex[n]      -- already in jindex
             --let nj1               = jindex[n+1]      
             let ix1               = shX + pos[ii3]   -- save
             let iy1               = shY + pos[ii3+1] -- save
@@ -95,19 +115,19 @@ entry main (nri: i32) (iinr: []i32) (jindex: []i32) (jjnr: []i32) (shift: []i32)
       let tx11              = dx11*fs11
       let ty11              = dy11*fs11
       let tz11              = dz11*fs11
-      in  [tx11, ty11, tz11]
+      in  (tx11, ty11, tz11)
 
 
   let txyz11s2Ds = map2 inner_body out_inds inn_inds
 
   -- let fixyz1 = reduce_comm (\[a1,b1,c1] [a2,b2,c2] -> [a1+a2, b1+b2, c1+c2] )
   --                          [nul, nul, nul] txyz11s2D
-  let scaned_txyzs = sgmscan (\ pt1 pt2 -> [ pt1[0]+pt2[0], pt1[1]+pt2[1], pt1[2]+pt2[2] ])
-                             [nul, nul, nul] flag txyz11s2Ds
-  let fixyz1s = map2 (\ b s -> scaned_txyzs[b+s-1] ) B inner_lens
+  let scaned_txyzs = sgmscan (\ (a1,b1,c1) (a2,b2,c2) -> (a1+a2, b1+b2, c1+c2))
+                             (nul, nul, nul) flag txyz11s2Ds
+  let (fix1s, fiy1s, fiz1s) = unzip3 <| map2 (\ b s -> scaned_txyzs[b+s-1] ) B inner_lens
 
   -- now the histogram computation
-  let txyz11s1Ds = flatten txyz11s2Ds
+  let (tx11s, ty11s, tz11s) = unzip3 txyz11s2Ds
 
   let len_flat_histo = 3*len_flat + 3*nri
   let (hist_inds, hist_vals) = unzip <|
@@ -120,15 +140,16 @@ entry main (nri: i32) (iinr: []i32) (jindex: []i32) (jjnr: []i32) (shift: []i32)
                  let iind = inn_inds[j]
                  let k = jindex[oind] + iind
                  let ind = 3*jjnr[k] + r
-                 let vla = nul - txyz11s1Ds[j3]
+                 let vla = nul - (if r==0 then tx11s[j] else if r==1 then ty11s[j] else tz11s[j])
                  in  (ind, vla)
             else -- get from fixyz1
                  let n = j - len_flat
                  let ind = 3*iinr[n] + r
-                 let vla = fixyz1s[n,r]
+                 let vla = if r==0 then fix1s[n] else if r==1 then fiy1s[n] else fiz1s[n]
                  in  (ind, vla)
         ) (iota len_flat_histo)
 
-  let faction' = reduce_by_index_rf 1 faction (+) nul hist_inds hist_vals
+  let faction' = reduce_by_index_rf 75i32 faction (+) nul hist_inds hist_vals
   in  faction'
+  --in (inn_inds)
 
