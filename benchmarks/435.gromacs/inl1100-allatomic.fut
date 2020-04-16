@@ -1,9 +1,9 @@
 -- ==
 -- entry: main
 --
+-- compiled input @ data/all-huge.in
 -- compiled input @ data/all-largest.in
 -- output @ data/all-largest.out
-
 
 -------------------------------------------------------------
 --   * This is gromacs innerloop inl1100
@@ -54,7 +54,7 @@ entry main  [nri] [nrip1] [nrj] [num_particles]
             (jindex: [nrip1]i32) (iinr: [nri]i32) (jjnr: [nrj]i32)
             (shift: [nri]i32) (types: [num_particles]i32) 
             (ntype: i32) (facel: real)
-            (shiftvec: []real) (pos: []real) (faction: *[]real)
+            (shiftvec: []real) (pos: []real) (faction: []real)
             (charge: []real) (nbfp: []real) 
         = --: *[]real =
 
@@ -115,41 +115,27 @@ entry main  [nri] [nrip1] [nrj] [num_particles]
       let tx11              = dx11*fs11
       let ty11              = dy11*fs11
       let tz11              = dz11*fs11
-      in  (tx11, ty11, tz11)
+      in  ([tx11, ty11, tz11], jnr, iinr[oind])
 
+  let (txyz11s2Ds, ext_jnrs, ext_inrs) = unzip3 <| map2 inner_body out_inds inn_inds
 
-  let txyz11s2Ds = map2 inner_body out_inds inn_inds
-
-  -- let fixyz1 = reduce_comm (\[a1,b1,c1] [a2,b2,c2] -> [a1+a2, b1+b2, c1+c2] )
-  --                          [nul, nul, nul] txyz11s2D
-  let scaned_txyzs = sgmscan (\ (a1,b1,c1) (a2,b2,c2) -> (a1+a2, b1+b2, c1+c2))
-                             (nul, nul, nul) flag txyz11s2Ds
-  let (fix1s, fiy1s, fiz1s) = unzip3 <| map2 (\ b s -> scaned_txyzs[b+s-1] ) B inner_lens
-
-  -- now the histogram computation
-  let (tx11s, ty11s, tz11s) = unzip3 txyz11s2Ds
-
-  let len_flat_histo = 3*len_flat + 3*nri
+  let len_flat_histo = 6*len_flat
   let (hist_inds, hist_vals) = unzip <|
     map (\j3 ->
-            let j = j3 / 3
-            let r = j3 - 3*j in
-            if j < len_flat
-            then -- get from - txyz11s1Ds
-                 let oind = out_inds[j]
-                 let iind = inn_inds[j]
-                 let k = jindex[oind] + iind
-                 let ind = 3*jjnr[k] + r
-                 let vla = nul - (if r==0 then tx11s[j] else if r==1 then ty11s[j] else tz11s[j])
-                 in  (ind, vla)
-            else -- get from fixyz1
-                 let n = j - len_flat
-                 let ind = 3*iinr[n] + r
-                 let vla = if r==0 then fix1s[n] else if r==1 then fiy1s[n] else fiz1s[n]
-                 in  (ind, vla)
+            let len3 = 3*len_flat
+            let j3 = if j3 < len3 then j3 else j3-len3
+            let j  = j3 / 3
+            let r  = j3 - 3*j
+            let txyz_val = txyz11s2Ds[j,r]
+            let (ind, hist_val) = if j3 < len3
+                                  then (ext_jnrs[j], nul - txyz_val)
+                                  else (ext_inrs[j], txyz_val)
+            let hist_ind = 3*ind + r
+            in  (hist_ind, hist_val)
         ) (iota len_flat_histo)
 
-  let faction' = reduce_by_index_rf 75i32 faction (+) nul hist_inds hist_vals
+  let faction' = reduce_by_index_rf 150i32 (copy faction) (+) nul hist_inds hist_vals
   in  faction'
-  --in (inn_inds)
+  --in (len_flat_histo, num_particles*3, length faction')
 
+--futhark bench --backend=opencl --pass-option=--default-num-groups=144 --pass-option=--default-group-size=256 -r 1000 inl1100.fut
