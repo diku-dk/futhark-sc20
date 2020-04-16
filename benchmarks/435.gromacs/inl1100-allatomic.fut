@@ -2,6 +2,8 @@
 -- entry: main
 --
 -- compiled input @ data/all-huge.in
+-- output @ data/all-huge.out
+--
 -- compiled input @ data/all-largest.in
 -- output @ data/all-largest.out
 
@@ -121,15 +123,15 @@ entry main  [nri] [nrip1] [nrj] [num_particles]
 
   let len_flat_histo = 6*len_flat
   let (hist_inds, hist_vals) = unzip <|
-    map (\j3 ->
+    map (\j6 ->
             let len3 = 3*len_flat
-            let j3 = if j3 < len3 then j3 else j3-len3
+            let j3 = if j6 < len3 then j6 else j6-len3
             let j  = j3 / 3
             let r  = j3 - 3*j
             let txyz_val = txyz11s2Ds[j,r]
-            let (ind, hist_val) = if j3 < len3
+            let (ind, hist_val) = if j6 < len3
                                   then (ext_jnrs[j], nul - txyz_val)
-                                  else (ext_inrs[j], txyz_val)
+                                  else (ext_inrs[j],       txyz_val)
             let hist_ind = 3*ind + r
             in  (hist_ind, hist_val)
         ) (iota len_flat_histo)

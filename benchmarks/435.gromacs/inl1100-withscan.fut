@@ -1,9 +1,11 @@
 -- ==
 -- entry: main
 --
+-- compiled input @ data/all-huge.in
+-- output @ data/all-huge.out
+--
 -- compiled input @ data/all-largest.in
 -- output @ data/all-largest.out
--- compiled input @ data/all-huge.in
 
 -------------------------------------------------------------
 --   * This is gromacs innerloop inl1100
