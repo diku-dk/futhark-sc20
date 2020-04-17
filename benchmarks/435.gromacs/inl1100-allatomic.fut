@@ -62,8 +62,6 @@ entry main  [nri] [nrip1] [nrj] [num_particles]
 
   -- building helper structures for flattening!
   let inner_lens = map (\i -> jindex[i+1] - jindex[i]) (iota nri)
-  --let B = map (\i -> if i==0 then 0i32 else inner_lens[i-1]) (iota nri)
-  --     |> scan (+) 0i32
   let B = jindex[:nri]
   let len_flat = jindex[nri]
   let tmp = map2 (\s b -> if s <= 0 then -1 else b) inner_lens B

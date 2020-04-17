@@ -27,7 +27,7 @@
 --  let tmp = map ($\lambda$ f$\rightarrow$ 1-f) flag  |\label{line:negflg}|
 --  let inn$_{inds}$ = sgmscan$^{inc}$ (+) 0 flag tmp        |\label{line:iotaws}|
 
-let sgmscan 't [n] (op: (t -> t -> t)) (ne: t) (flag: [n]i32) (vals: [n]t) : [n]t =
+let sgmscan 't [n] (op: (t -> t -> t)) (ne: t) (flag: [n]i8) (vals: [n]t) : [n]t =
   let (_, res) = scan (\ (f1,v1) (f2,v2) ->
                             let f = f1 | f2
                             let v = if f2 != 0 then v2 else op v1 v2
@@ -62,15 +62,12 @@ entry main  [nri] [nrip1] [nrj] [num_particles]
 
   -- building helper structures for flattening!
   let inner_lens = map (\i -> jindex[i+1] - jindex[i]) (iota nri)
-  --let B = map (\i -> if i==0 then 0i32 else inner_lens[i-1]) (iota nri)
-  --     |> scan (+) 0i32
   let B = jindex[:nri]
   let len_flat = jindex[nri]
-  let tmp = map2 (\s b -> if s <= 0 then -1 else b) inner_lens B
-  let flag= scatter (replicate len_flat 0i32) tmp (replicate nri 1)
-  let out_inds = map (\i -> if i==0 then 0 else flag[i]) (iota len_flat)
+  let flag= scatter (replicate len_flat 0i8) B (replicate nri 1i8)
+  let out_inds = map (\i -> if i==0 then 0i32 else (i32.i8 flag[i])) (iota len_flat)
               |> scan (+) 0i32
-  let inn_inds = map (\f -> 1-f) flag
+  let inn_inds = map (\f -> 1i32 - (i32.i8 f)) flag
               |> sgmscan (+) 0 flag
 
   let (ix1s, iy1s, iz1s, iqAs, ntiAs) = unzip5 <|
@@ -152,6 +149,6 @@ entry main  [nri] [nrip1] [nrj] [num_particles]
   in  faction'
   --in (len_flat_histo, num_particles*3, length faction')
 
---futhark bench --backend=opencl --pass-option=--default-num-groups=144 --pass-option=--default-group-size=256 -r 1000 inl1100-scan.fut
--- ./inl1100-scan -t /dev/stderr -D --default-num-groups=144 --default-group-size=256 < data/all-huge.in > /dev/null
+--futhark bench --backend=opencl --pass-option=--default-num-groups=144 --pass-option=--default-group-size=256 -r 1000 inl1100-withscan.fut
+-- ./inl1100-withscan -t /dev/stderr -D --default-num-groups=144 --default-group-size=256 < data/all-huge.in > /dev/null
 
