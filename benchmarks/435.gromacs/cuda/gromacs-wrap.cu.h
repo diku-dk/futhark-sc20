@@ -99,23 +99,12 @@ unsigned long int inl1100_cuda_allhist(
         real* charge, real* nbfp, real* faction_h
 ) {
     const uint32_t B = 256;
-    const unsigned int mem_flag = len_flat * sizeof(char);
-    const unsigned int mem_inds = len_flat * sizeof(int32_t);
-    const unsigned int mem_tmp_scan = MAX_BLOCK_SZ * sizeof(int32_t);
-    const unsigned int mem_tmp_flag = MAX_BLOCK_SZ * sizeof(char);
     const unsigned int mem_ntiAs = nri * sizeof(int32_t);
     const unsigned int mem_ixyz  = nri * sizeof(real);
     const unsigned int mem_faction = 3 * num_particles * sizeof(real);
 
-    char *flag = NULL, *tmp_flag = NULL;
-    int32_t *out_inds = NULL, *inn_inds = NULL, *tmp_scan = NULL, *ntiAs = NULL;
+    int32_t *ntiAs = NULL;
     real *ix1s = NULL, *iy1s = NULL, *iz1s = NULL, *iqAs = NULL;
-    
-    cudaMalloc((void**) &flag,     mem_flag);
-    cudaMalloc((void**) &out_inds, mem_inds);
-    cudaMalloc((void**) &inn_inds, mem_inds);
-    cudaMalloc((void**) &tmp_scan, mem_tmp_scan);
-    cudaMalloc((void**) &tmp_flag, mem_tmp_flag);
 
     cudaMalloc((void**) &ntiAs, mem_ntiAs);
     cudaMalloc((void**) &ix1s,  mem_ixyz);
@@ -127,31 +116,7 @@ unsigned long int inl1100_cuda_allhist(
     gettimeofday(&t_start, NULL);
 
     for(int i=0; i < GPU_RUNS; i++) {
-        cudaMemset(flag, 0, mem_flag);
         cudaMemcpy(faction, faction0, mem_faction, cudaMemcpyDeviceToDevice);
-
-        { // make flag array
-            const uint32_t num_threads = nri;
-            const uint32_t num_blocks = (num_threads + B - 1) / B;
-            mkFlagKernel<<<num_blocks,B>>>(flag, jindex, nri);
-        }
-        //gpuAssert( cudaPeekAtLastError() );
-        //fprintf(stderr, "1111\n");
-
-        // out_inds = map (\i -> if i==0 then 0 else flag[i]) (iota len_flat) |> scan (+) 0i32
-        scanInc<Add1>( B, len_flat, out_inds, flag, tmp_scan );
-        //gpuAssert( cudaPeekAtLastError() );
-        //fprintf(stderr, "2222, len_flat: %d\n", len_flat);
-
-        // set first element of flag baxck to 1
-        setFirstFlagElmKernel<<<1,16>>>(flag);
-        //gpuAssert( cudaPeekAtLastError() );
-        //fprintf(stderr, "3333\n");
-
-        //let inn_inds = map (\f -> 1-f) flag |> sgmscan (+) 0 flag
-        sgmScanInc<Add2> ( B, len_flat, inn_inds, flag, flag, tmp_scan, tmp_flag );
-        //gpuAssert( cudaPeekAtLastError() );
-        //fprintf(stderr, "4444\n");
 
         { // outer loop part
             const uint32_t num_threads = nri;
@@ -159,19 +124,15 @@ unsigned long int inl1100_cuda_allhist(
             outerLoopKernel<<<num_blocks,B>>>( nri, facel, ntype, shift, shiftvec, iinr, types
                                              , pos, charge, ix1s, iy1s, iz1s, iqAs, ntiAs);
         }
-        //gpuAssert( cudaPeekAtLastError() );
-        //fprintf(stderr, "5555\n");
 
         { // inner loop part
             const uint32_t num_threads = len_flat;
             const uint32_t num_blocks = (num_threads + B - 1) / B;
-            innerLoopKernel<<<num_blocks,B>>>( len_flat, jindex, out_inds, inn_inds
+            innerLoopKernel<<<num_blocks,B>>>( len_flat, nri, jindex
                                              , iinr, jjnr, types, pos, charge, nbfp
                                              , ix1s, iy1s, iz1s, iqAs, ntiAs, faction
                                              );
         }
-        //gpuAssert( cudaPeekAtLastError() );
-        //fprintf(stderr, "6666\n");
     }
 
     cudaDeviceSynchronize();
@@ -187,10 +148,15 @@ unsigned long int inl1100_cuda_allhist(
         cudaMemcpy(faction_dh, faction, mem_faction, cudaMemcpyDeviceToHost);
         is_valid = validate32(faction_h, faction_dh, 3 * num_particles);
         
+#if 0
+        printf("\nFaction-Host:\n");
+        printArray(faction_h, 20);
+    
+        printf("\nFaction-Device:\n");
+        printArray(faction_dh, 20);
+#endif
 
         free(faction_dh);
-        cudaFree(flag); cudaFree(out_inds); cudaFree(inn_inds);
-        cudaFree(tmp_scan); cudaFree(tmp_flag);
         cudaFree(ntiAs); cudaFree(iqAs);
         cudaFree(ix1s); cudaFree(iy1s); cudaFree(iz1s);
 

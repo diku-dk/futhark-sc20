@@ -94,7 +94,7 @@ void randomInit(real* data, int size) {
 
 void printArray(real* data, int size) {
     printf("[");
-    if(size > 0) printf("%fi32", data[0]);
+    if(size > 0) printf("%f", data[0]);
     for (int i = 1; i < size; ++i)
         printf(", %f", data[i]);
     printf("]");
@@ -106,7 +106,7 @@ void zeroOut(T* data, int size) {
         data[i] = 0;
 }
 
-#define EPS 0.001
+#define EPS 0.0003
 bool validate32(real* A, real* B, unsigned int sizeAB) {
     for(unsigned int i = 0; i < sizeAB; i++) {
         real error = fabs(A[i] - B[i]) / fabs(A[i]);

@@ -15,4 +15,5 @@ let main [n][m][p][q][t](jindex: [n]i32)
   let rf2_ones = scatter (replicate t 0i32) (jjnr[t:2*t] :> [t]i32) (replicate t 1)
   let rf2 = t / reduce_comm (+) 0i32 rf2_ones
 
-  in  (n,m,p,q,t, max_i, max_j, max_shift, max_types, max_jindex, rf1, rf2)
+  --in  (n,m,p,q,t, max_i, max_j, max_shift, max_types, max_jindex, rf1, rf2)
+  in (m, p, jindex[m])

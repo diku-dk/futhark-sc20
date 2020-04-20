@@ -1,8 +1,8 @@
 -- ==
 -- entry: main
 --
--- compiled input @ data/all-huge.in
--- output @ data/all-huge.out
+-- compiled input @ data/all-huge-correct.in
+-- output @ data/all-huge-correct.out
 --
 -- compiled input @ data/all-largest.in
 -- output @ data/all-largest.out

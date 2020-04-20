@@ -66,13 +66,25 @@ let main [np] [n1][m1] [n2][m2] [n3][m3] [n4][m4] [n5][m5] [n6][m6] [n7][m7]
                                     , types10, types11, types12, types13, types14, types15, types16
                                     , types17, types18, types19, types20, types21, types22]
 
+    let (q1, q2, q3, q4, q5, q6, q7, q8) = (jindex1[n1], jindex2[n2], jindex3[n3], jindex4[n4],
+                                            jindex5[n5], jindex6[n6], jindex7[n7], jindex8[n8])
+
+    let (q9, q10, q11, q12, q13, q14, q15, q16) = 
+        (jindex9[n9], jindex10[n10], jindex11[n11], jindex12[n12],
+         jindex13[n13], jindex14[n14], jindex15[n15], jindex16[n16])
+
+    let (q17, q18, q19, q20, q21, q22) = 
+        (jindex17[n17], jindex18[n18], jindex19[n19], jindex20[n20], jindex21[n21], jindex22[n22])
+    
+
     let iinr = iinr1 ++ iinr2 ++ iinr3 ++ iinr4 ++ iinr5 ++ iinr6 ++ iinr7 ++ iinr8 ++ iinr9
                ++ iinr10 ++ iinr11 ++ iinr12 ++ iinr13 ++ iinr14 ++ iinr15 ++ iinr16
                ++ iinr17 ++ iinr18 ++ iinr19 ++ iinr20 ++ iinr21 ++ iinr22
 
-    let jjnr = jjnr1 ++ jjnr2 ++ jjnr3 ++ jjnr4 ++ jjnr5 ++ jjnr6 ++ jjnr7 ++ jjnr8 ++ jjnr9
-               ++ jjnr10 ++ jjnr11 ++ jjnr12 ++ jjnr13 ++ jjnr14 ++ jjnr15 ++ jjnr16
-               ++ jjnr17 ++ jjnr18 ++ jjnr19 ++ jjnr20 ++ jjnr21 ++ jjnr22
+    let jjnr = jjnr1[:q1] ++ jjnr2[:q2] ++ jjnr3[:q3] ++ jjnr4[:q4] ++ jjnr5[:q5] ++ jjnr6[:q6]
+            ++ jjnr7[:q7] ++ jjnr8[:q8] ++ jjnr9[:q9] ++ jjnr10[:q10] ++ jjnr11[:q11] ++ jjnr12[:q12]
+            ++ jjnr13[:q13] ++ jjnr14[:q14] ++ jjnr15[:q15] ++ jjnr16[:q16] ++ jjnr17[:q17]
+            ++ jjnr18[:q18] ++ jjnr19[:q19] ++ jjnr20[:q20] ++ jjnr21[:q21] ++ jjnr22[:q22]
 
     let shift= shift1 ++ shift2 ++ shift3 ++ shift4 ++ shift5 ++ shift6 ++ shift7 ++ shift8 ++ shift9
                ++ shift10 ++ shift11 ++ shift12 ++ shift13 ++ shift14 ++ shift15 ++ shift16

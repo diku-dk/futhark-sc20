@@ -19,7 +19,7 @@
 #endif
 
 #define CPU_RUNS 10
-#define GPU_RUNS 1000
+#define GPU_RUNS 5000
 
 
 unsigned int HWD;
@@ -114,8 +114,8 @@ int main(int argc, char **argv) {
         num_particles = types_len;
     }
 
-    fprintf( stderr, "Datatset characteristics are: (num_particles=%d), (nri=%d), (nrj: %d)\n"
-           , num_particles, nri, nrj
+    fprintf( stderr, "Datatset characteristics are: (num_particles=%d), (nri=%d), (nrj: %d), (last jindex: %d)\n"
+           , num_particles, nri, nrj, jindex[nri]
            );
 
     // shiftvec: [3*23]f32

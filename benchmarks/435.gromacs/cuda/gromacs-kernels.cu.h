@@ -27,7 +27,7 @@ class Add2 {
     static __device__ __host__ inline RedElTp remVolatile(volatile RedElTp& t) { RedElTp res = t; return res; }
 };
 
-#if 1
+#if 0
 /**************************************************/
 /*** AtomicAdd demonstrated on real addition    ***/
 /**************************************************/
@@ -40,31 +40,24 @@ atomADD(volatile real* loc_hists, int idx, real v) {
 /**************************************************/
 /*** CAS implementation of atomic add on floats ***/
 /**************************************************/
+__device__ inline static float
+atomic_fadd_f32_global(volatile float *p, float x) {
+  union { int32_t i; float f; } old;
+  union { int32_t i; float f; } assumed;
+  old.f = *p;
+  do {
+    assumed.f = old.f;
+    old.f = old.f + x;
+    old.i = atomicCAS((int32_t*)p, assumed.i, old.i);
+  } while (assumed.i != old.i); 
+  return old.f;
+}
+
 __device__ inline static void 
 atomADD(volatile real *address, uint32_t idx, real val) {
-    int tmp0 = *address; 
-    int i_val = __float_as_int(val + __int_as_float(tmp0)); 
-    int tmp1;
-
-    while( (tmp1 = atomicCAS((int *)(address+idx), tmp0, i_val)) != tmp0)
-    { 
-        tmp0 = tmp1; 
-        i_val = __float_as_int(val + __int_as_float(tmp1));
-    }
+    atomic_fadd_f32_global(address+idx, val);
 }
-#endif
 
-#if 0
-__device__ inline static void
-atomCAS(volatile real* loc_hists, uint32_t idx, real v) {
-    real old = loc_hists[idx];
-    real assumed, upd;
-    do {
-        assumed = old;
-        upd = assumed + v;
-        old = atomicCAS( (real*)&loc_hists[idx], assumed, upd );
-    } while(assumed != old);
-}
 #endif
 
 /***********************/
@@ -106,9 +99,30 @@ outerLoopKernel( int32_t nri, real facel, int32_t ntype
     }
 }
 
+__device__ inline static int32_t
+binSearch(int32_t gid, int32_t N, int32_t* A) {
+    int32_t L = 0;
+    int32_t R = N - 1;
+
+    while (L <= R) {
+        int32_t m = (L + R) / 2;
+        if(A[m] <= gid) {
+            if(m < N-1 && A[m+1] > gid) {
+                return m;
+            }
+            L = m + 1;
+        } else if (A[m] > gid) {
+            if(m > 0 && A[m-1] <= gid) {
+                return m-1;
+            }
+            R = m - 1;
+        }
+    }
+    return -1;
+}
 
 __global__ void 
-innerLoopKernel( int32_t len_flat, int32_t* jindex, int32_t* out_inds, int32_t* inn_inds
+innerLoopKernel( int32_t len_flat, int32_t nri, int32_t* jindex
                , int32_t* iinr, int32_t* jjnr, int32_t* types, real* pos, real* charge
                , real* nbfp, real* ix1s, real* iy1s, real* iz1s, real* iqAs, int32_t* ntiAs
                , volatile real* faction
@@ -116,9 +130,8 @@ innerLoopKernel( int32_t len_flat, int32_t* jindex, int32_t* out_inds, int32_t* 
 ) {
     uint32_t gid = blockIdx.x * blockDim.x + threadIdx.x;
     if(gid < len_flat) {
-        int32_t oind = out_inds[gid];
-        int32_t iind = inn_inds[gid];
-        int32_t k    = jindex[oind] + iind;
+        int32_t oind = binSearch(gid, nri+1, jindex);
+        int32_t k    = gid;
         real    ix1  = ix1s[oind], 
                 iy1  = iy1s[oind],
                 iz1  = iz1s[oind],

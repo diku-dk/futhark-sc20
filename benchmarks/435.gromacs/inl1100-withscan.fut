@@ -145,7 +145,7 @@ entry main  [nri] [nrip1] [nrj] [num_particles]
                  in  (ind, vla)
         ) (iota len_flat_histo)
 
-  let faction' = reduce_by_index_rf 175i32 (copy faction) (+) nul hist_inds hist_vals
+  let faction' = reduce_by_index_rf 82i32 (copy faction) (+) nul hist_inds hist_vals
   in  faction'
   --in (len_flat_histo, num_particles*3, length faction')
 
