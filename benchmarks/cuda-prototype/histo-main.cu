@@ -201,24 +201,14 @@ void autoLocSubHistoDeg(const AtomicPrim prim_kind, const int RF, const int H, c
     const int el_size = (prim_kind == XCHG)? 3*sizeof(int) : sizeof(int);
     float m_prime = MIN( (lmem*1.0 / el_size), (float)elms_per_block ) / H;
 
-    if (prim_kind == ADD) {
-        *M = max(1, min( (int)floor(m_prime), BLOCK ) );
-        *M = min(*M, work_asymp_M_max);
-    } else {
-        float m = max(1.0, m_prime);
-        const float RFC = MIN( (float)RF, 32.0*pow(RF/32.0, 0.33) );
-        float f_prime = (BLOCK*RFC) / (m*m*H);
-        float f_lower = (prim_kind==CAS) ? ceil(f_prime) : floor(f_prime);
-        const int  f  = max(1, (int)f_lower);
-        *M = max(1, min( (int)floor((prim_kind==CAS)? m*f : m_prime*f), BLOCK));
-        *M = min(*M, work_asymp_M_max);
 
-        printf("In computeLocM: prim-kind %d, H %d, result f: %f, m: %f, M: %d\n"
-              , prim_kind, H, f_prime, m, *M);
-    }
+    *M = max(1, min( (int)floor(m_prime), BLOCK ) );
+    *M = min(*M, work_asymp_M_max);
+
     const int len = lmem / (el_size * (*M));
     *num_chunks = (H + len - 1) / len;
 }
+
 
 void autoGlbChunksSubhists(
                            const AtomicPrim prim_kind, const int RF, const int H, const int N, const int T, const int L2,
@@ -260,7 +250,7 @@ void runLocalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, int RF, i
                         const char *hwd_csv, const char *cas_csv, const char *xcg_csv) {
     const int num_histos = 8;
     const int num_m_degs = 6;
-    const int histo_sizes[num_histos] = {25, 121, 505, 2041, 6141, 12281, 24569, 49145};
+    const int histo_sizes[num_histos] = {31, 127, 505, 2041, 6141, 12281, 24569, 49145};
                                         //{/*25, 121, 505, 1024-7,*/ 2048-7, 4089, 6143, 12287, 24575, 49151};
                                         //{ 25, 57, 121, 249, 505, 1024-7, 4096-7, 12288-1, 24575, 4*12*1024-1 };
                                         //{ 64, 128, 256, 512 };
