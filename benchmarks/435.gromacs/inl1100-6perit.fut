@@ -1,8 +1,8 @@
 -- ==
 -- entry: main
 --
--- compiled input @ data/all-huge-correct.in
--- output @ data/all-huge-correct.out
+-- compiled input @ data/all-huge.in
+-- output @ data/all-huge.out
 --
 -- compiled input @ data/all-largest.in
 -- output @ data/all-largest.out
@@ -61,13 +61,10 @@ entry main  [nri] [nrip1] [nrj] [num_particles] [histo_len]
         = --: *[]real =
 
   -- building helper structures for flattening!
-  let B = jindex[:nri]
   let len_flat = jindex[nri]
-  let flag= scatter (replicate len_flat 0i8) B (replicate nri 1i8)
+  let flag= scatter (replicate len_flat 0i8) (jindex[:nri]) (replicate nri 1i8)
   let out_inds = map (\i -> if i==0 then 0i32 else (i32.i8 flag[i])) (iota len_flat)
               |> scan (+) 0i32
-  let inn_inds = map (\f -> 1i32 - (i32.i8 f)) flag
-              |> sgmscan (+) 0 flag
 
   let (ix1s, iy1s, iz1s, iqAs, ntiAs) = unzip5 <|
     map (\n ->
@@ -87,8 +84,7 @@ entry main  [nri] [nrip1] [nrj] [num_particles] [histo_len]
             in  (ix1, iy1, iz1, iqA, ntiA)
         ) (iota nri)
 
-  let inner_body (oind: i32) (iind: i32) =
-      let k                 = (unsafe jindex[oind]) + iind
+  let inner_body (oind: i32) (k: i32) =
       let (ix1, iy1, iz1)   = (unsafe ix1s[oind], unsafe iy1s[oind], unsafe iz1s[oind])
       let (iqA, ntiA)       = (unsafe iqAs[oind], unsafe ntiAs[oind])
 
@@ -117,7 +113,7 @@ entry main  [nri] [nrip1] [nrj] [num_particles] [histo_len]
 
   let faction_iinr = replicate histo_len nul |> unflatten num_particles 3
   let faction_jjnr = copy faction1d |> unflatten num_particles 3
-  let (txyz11s2Ds_iinr, ext_jnrs, ext_inrs) = unzip3 <| map2 inner_body out_inds inn_inds
+  let (txyz11s2Ds_iinr, ext_jnrs, ext_inrs) = unzip3 <| map2 inner_body out_inds (iota len_flat)
   let txyz11s2Ds_jjnr = map (\row -> map (\x -> nul-x) row) txyz11s2Ds_iinr
 
   let faction_jjnr' = reduce_by_index_rf 150i32 faction_jjnr (map2 (+)) [nul,nul,nul] ext_jnrs txyz11s2Ds_jjnr |> flatten

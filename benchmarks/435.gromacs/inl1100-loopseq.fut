@@ -1,26 +1,13 @@
 -- ==
 -- entry: main
 --
--- compiled input @ data/all-huge-correct.in
--- output @ data/all-huge-correct.out
+-- compiled input @ data/all-huge.in
+-- output @ data/all-huge.out
 --
 -- compiled input @ data/all-largest.in
 -- output @ data/all-largest.out
 
--------------------------------------------------------------
---   * This is gromacs innerloop inl1100
---   * Forces:      Calculated
---   * Coulomb:     Normal
---   * Nonbonded:   Lennard-Jones
---   * Solvent opt: No
---   * Free energy: No
---------------------------------------------------------------
-
-type real   =  f32
-let nul     =  0.0f32
-let one     =  1.0f32
-let six     =  6.0f32
-let twelve  = 12.0f32
+import "util"
 
 
 -- ntype 19, types \in [0..18]
