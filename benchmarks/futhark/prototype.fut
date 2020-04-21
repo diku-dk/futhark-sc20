@@ -3,8 +3,8 @@ let reduce_by_index_rf 'a [m] [n] (rf: i32) (dest : *[m]a) (f : a -> a -> a) (ne
 
 -- ==
 -- entry: hwd cas
--- compiled random input { 25 1 [50000000]i32 } auto output
--- compiled random input { 121 1 [50000000]i32 } auto output
+-- compiled random input { 31 1 [50000000]i32 } auto output
+-- compiled random input { 127 1 [50000000]i32 } auto output
 -- compiled random input { 505 1 [50000000]i32 } auto output
 -- compiled random input { 2041 1 [50000000]i32 } auto output
 -- compiled random input { 6141 1 [50000000]i32 } auto output
@@ -16,18 +16,18 @@ let reduce_by_index_rf 'a [m] [n] (rf: i32) (dest : *[m]a) (f : a -> a -> a) (ne
 -- compiled random input { 786431 1 [50000000]i32 } auto output
 -- compiled random input { 1572863 1 [50000000]i32 } auto output
 --
--- compiled random input { 25 64 [50000000]i32 } auto output
--- compiled random input { 121 64 [50000000]i32 } auto output
--- compiled random input { 505 64 [50000000]i32 } auto output
--- compiled random input { 2041 64 [50000000]i32 } auto output
--- compiled random input { 6141 64 [50000000]i32 } auto output
--- compiled random input { 12281 64 [50000000]i32 } auto output
--- compiled random input { 24569 64 [50000000]i32 } auto output
--- compiled random input { 49145 64 [50000000]i32 } auto output
--- compiled random input { 196607 64 [50000000]i32 } auto output
--- compiled random input { 393215 64 [50000000]i32 } auto output
--- compiled random input { 786431 64 [50000000]i32 } auto output
--- compiled random input { 1572863 64 [50000000]i32 } auto output
+-- compiled random input { 31 63 [50000000]i32 } auto output
+-- compiled random input { 127 63 [50000000]i32 } auto output
+-- compiled random input { 505 63 [50000000]i32 } auto output
+-- compiled random input { 2041 63 [50000000]i32 } auto output
+-- compiled random input { 6141 63 [50000000]i32 } auto output
+-- compiled random input { 12281 63 [50000000]i32 } auto output
+-- compiled random input { 24569 63 [50000000]i32 } auto output
+-- compiled random input { 49145 63 [50000000]i32 } auto output
+-- compiled random input { 196607 63 [50000000]i32 } auto output
+-- compiled random input { 393215 63 [50000000]i32 } auto output
+-- compiled random input { 786431 63 [50000000]i32 } auto output
+-- compiled random input { 1572863 63 [50000000]i32 } auto output
 
 let stride : i32 = 64--16
 
@@ -48,8 +48,8 @@ entry cas [n] (H: i32) (RF: i32) (vs: [n]i32) =
 -- ==
 -- entry: xcg
 --
--- compiled random input { 25 1 [50000000]i32 [50000000]i32 } auto output
--- compiled random input { 121 1 [50000000]i32 [50000000]i32 } auto output
+-- compiled random input { 31 1 [50000000]i32 [50000000]i32 } auto output
+-- compiled random input { 127 1 [50000000]i32 [50000000]i32 } auto output
 -- compiled random input { 505 1 [50000000]i32 [50000000]i32 } auto output
 -- compiled random input { 2041 1 [50000000]i32 [50000000]i32 } auto output
 -- compiled random input { 6141 1 [50000000]i32 [50000000]i32 } auto output
@@ -61,18 +61,18 @@ entry cas [n] (H: i32) (RF: i32) (vs: [n]i32) =
 -- compiled random input { 786431 1 [50000000]i32 [50000000]i32 } auto output
 -- compiled random input { 1572863 1 [50000000]i32 [50000000]i32 } auto output
 --
--- compiled random input { 25 64 [50000000]i32 [50000000]i32 } auto output
--- compiled random input { 121 64 [50000000]i32 [50000000]i32 } auto output
--- compiled random input { 505 64 [50000000]i32 [50000000]i32 } auto output
--- compiled random input { 2041 64 [50000000]i32 [50000000]i32 } auto output
--- compiled random input { 6141 64 [50000000]i32 [50000000]i32 } auto output
--- compiled random input { 12281 64 [50000000]i32 [50000000]i32 } auto output
--- compiled random input { 24569 64 [50000000]i32 [50000000]i32 } auto output
--- compiled random input { 49145 64 [50000000]i32 [50000000]i32 } auto output
--- compiled random input { 196607 64 [50000000]i32 [50000000]i32 } auto output
--- compiled random input { 393215 64 [50000000]i32 [50000000]i32 } auto output
--- compiled random input { 786431 64 [50000000]i32 [50000000]i32 } auto output
--- compiled random input { 1572863 64 [50000000]i32 [50000000]i32 } auto output
+-- compiled random input { 31 63 [50000000]i32 [50000000]i32 } auto output
+-- compiled random input { 127 63 [50000000]i32 [50000000]i32 } auto output
+-- compiled random input { 505 63 [50000000]i32 [50000000]i32 } auto output
+-- compiled random input { 2041 63 [50000000]i32 [50000000]i32 } auto output
+-- compiled random input { 6141 63 [50000000]i32 [50000000]i32 } auto output
+-- compiled random input { 12281 63 [50000000]i32 [50000000]i32 } auto output
+-- compiled random input { 24569 63 [50000000]i32 [50000000]i32 } auto output
+-- compiled random input { 49145 63 [50000000]i32 [50000000]i32 } auto output
+-- compiled random input { 196607 63 [50000000]i32 [50000000]i32 } auto output
+-- compiled random input { 393215 63 [50000000]i32 [50000000]i32 } auto output
+-- compiled random input { 786431 63 [50000000]i32 [50000000]i32 } auto output
+-- compiled random input { 1572863 63 [50000000]i32 [50000000]i32 } auto output
 
 let unpack (a: u64) : (i32, i32) =
   (i32.u64 a, i32.u64 (a >> 32))
