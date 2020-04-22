@@ -27,7 +27,7 @@ class Add2 {
     static __device__ __host__ inline RedElTp remVolatile(volatile RedElTp& t) { RedElTp res = t; return res; }
 };
 
-#if 0
+#if WITH_HDW
 /**************************************************/
 /*** AtomicAdd demonstrated on real addition    ***/
 /**************************************************/

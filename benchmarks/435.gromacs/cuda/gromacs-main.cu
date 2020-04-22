@@ -224,9 +224,13 @@ int main(int argc, char **argv) {
                               , ntype, facel
                               , shiftvec_d, pos_d, faction0_d, faction_d
                               , charge_d, nbfp_d, faction );
-
-        printf("CUDA timing for version using 6 atomic adds per inner iteration: %lu microseconds to run!\n"
+#if WITH_HDW
+        printf("Cuda HWD timing for version using 6 atomic adds per inner iteration: %lu microseconds to run!\n"
               , elapsed_cuda_allhist);
+#else
+        printf("Cuda CAS timing for version using 6 atomic adds per inner iteration: %lu microseconds to run!\n"
+              , elapsed_cuda_allhist);
+#endif
     }
 
     { // free cuda and hoist memory
