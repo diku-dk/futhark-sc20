@@ -109,7 +109,7 @@ void printTextTab( const unsigned long runtimes[3][num_histos][num_m_degs]
           if (j < num_m_degs-1) {
               printf(BOLD "M=%d\t" RESET, kms[j]);
           } else {
-              printf(BOLD "Ours\t" RESET);
+              printf(BOLD "Auto\t" RESET);
           }
           for(int i = 0; i<num_histos; i++) {
               printf("%lu\t", runtimes[k][i][j]);
@@ -176,7 +176,7 @@ void printCSV(const char *csv, int k,
         if (j < num_m_degs-1) {
             fprintf(f, "%s%d", mstr, kms[j]);
         } else {
-            fprintf(f, "Ours");
+            fprintf(f, "Auto");
         }
         for(int i = 0; i<num_histos; i++) {
             fprintf(f, ",%lu", runtimes[k][i][j]);
