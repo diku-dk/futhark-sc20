@@ -2,7 +2,7 @@ let reduce_by_index_rf 'a [m] [n] (rf: i32) (dest : *[m]a) (f : a -> a -> a) (ne
   intrinsics.hist (rf, dest, f, ne, is, as) :> *[m]a
 
 -- ==
--- entry: hwd cas
+-- entry: hdw cas
 -- compiled random input { 31 1 [50000000]i32 } auto output
 -- compiled random input { 127 1 [50000000]i32 } auto output
 -- compiled random input { 505 1 [50000000]i32 } auto output
@@ -34,7 +34,7 @@ let stride : i32 = 64--16
 let index (H: i32) (RF: i32) (elm: i32) =
   i32.u32 (u32.i32 elm %% u32.max 1 (u32.i32 (H/RF))) * RF
 
-entry hwd [n] (H: i32) (RF: i32) (vs: [n]i32) =
+entry hdw [n] (H: i32) (RF: i32) (vs: [n]i32) =
   reduce_by_index_rf RF (replicate H 0) (+) 0 (map (index H RF) vs) vs
 
 let sat_add_u24 (x: i32) (y: i32): i32 =
