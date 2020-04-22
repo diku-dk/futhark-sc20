@@ -1,2 +1,2 @@
-# futhark-hlpp19
-Artifact for the HLPP19 paper.
+# futhark-sc20
+Artifact for the SC20 paper.
