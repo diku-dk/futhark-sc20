@@ -36,8 +36,9 @@ int main (int argc, char * argv[]) {
     }
     const uint32_t N = atoi(argv[1]);
     const uint32_t H = atoi(argv[2]);
+#ifdef WITH_PRINT
     printf("Computing for image size: %d and histogram size: %d\n", N, H);
-
+#endif
     //Allocate and Initialize Host data with random values
     uint32_t* h_data  = (uint32_t*)malloc(N*sizeof(uint32_t));
     uint32_t* h_histo = (uint32_t*)malloc(H*sizeof(uint32_t));
@@ -54,7 +55,9 @@ int main (int argc, char * argv[]) {
         gettimeofday(&t_end, NULL);
         timeval_subtract(&t_diff, &t_end, &t_start);
         elapsed = (t_diff.tv_sec*1e6+t_diff.tv_usec); 
+#ifdef WITH_PRINT
         printf("Golden (Sequential) Histogram runs in: %.2f microsecs\n", elapsed);
+#endif
     }
 
     //Allocate and Initialize Device data
@@ -104,13 +107,16 @@ int main (int argc, char * argv[]) {
     cudaCheckError();
 
     cudaSucceeded(cudaMemcpy (h_histo, d_histo, H*sizeof(uint32_t), cudaMemcpyDeviceToHost));
+#ifdef WITH_PRINT
     printf("CUB Histogram ... ");
+#endif
     bool success = validateZ<uint32_t>(g_histo, h_histo, H);
 
-    printf("CUB Histogram runs in: %.2f microsecs\n", elapsed);
+    printf("CUB Histogram for H=%d runs in: %.2f microsecs\n", H, elapsed);
     double gigaBytesPerSec = 3 * N * sizeof(uint32_t) * 1.0e-3f / elapsed; 
+#ifdef WITH_PRINT
     printf( "CUB Histogram GBytes/sec = %.2f!\n", gigaBytesPerSec); 
-
+#endif
     // Cleanup and closing
     cudaFree(d_data); cudaFree(d_histo); cudaFree(d_temp_storage);
     free(h_data); free(g_histo); free(h_histo);
