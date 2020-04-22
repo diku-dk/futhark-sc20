@@ -246,7 +246,7 @@ locMemHwdAddCoopKernel( const int RF, const int N, const int H, const int M
 
     // naive reduction of the histograms of the current block
     unsigned int upbd = M*Hchunk;
-    for(int i = tid; i < Hchunk; i+=blockDim.x) {
+    for(int i = tid; (i < Hchunk) && (chunk_beg+i < H); i+=blockDim.x) {
         BETA acc = loc_hists[i];
         for(int j=Hchunk; j<upbd; j+=Hchunk) {
             BETA cur = loc_hists[i+j];

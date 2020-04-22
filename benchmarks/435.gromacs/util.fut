@@ -30,3 +30,8 @@ let binSearch [N] (gid: i32) (A: [N]i32) : i32 =
              then (m-1, 1, 0) -- return m-1
              else (-1i32, L, m - 1)
  ).0
+
+let calcRF [h] (inds: [h]i32) =
+    let RF0 = scatter (replicate h 0i32) inds (replicate h 1i32)
+           |> reduce (+) 0
+    in  3*(h/RF0)

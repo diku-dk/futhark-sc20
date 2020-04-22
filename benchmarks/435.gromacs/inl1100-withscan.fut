@@ -3,6 +3,7 @@
 --
 -- compiled input @ data/all-huge.in
 -- output @ data/all-huge.out
+
 --
 -- compiled input @ data/all-largest.in
 -- output @ data/all-largest.out
@@ -77,6 +78,9 @@ entry main  [nri] [nrip1] [nrj] [num_particles]
 
   let (txyz11s2Ds, ext_jnrs) = unzip <| map2 inner_body out_inds (iota len_flat)
 
+  let H = num_particles
+  let RF = ( calcRF (ext_jnrs[15*H: 16*H]) + calcRF (ext_jnrs[30*H: 31*H]) ) / 2 + 1
+
   -- let fixyz1 = reduce_comm (\[a1,b1,c1] [a2,b2,c2] -> [a1+a2, b1+b2, c1+c2] )
   --                          [nul, nul, nul] txyz11s2D
   let scaned_txyzs = sgmscan (\ (a1,b1,c1) (a2,b2,c2) -> (a1+a2, b1+b2, c1+c2))
@@ -103,7 +107,7 @@ entry main  [nri] [nrip1] [nrj] [num_particles]
                  in  (ind, vla)
         ) (iota len_flat_histo)
 
-  let faction' = reduce_by_index_rf 82i32 (copy faction) (+) nul hist_inds hist_vals
+  let faction' = reduce_by_index_rf 79i32 (copy faction) (+) nul hist_inds hist_vals
   in  faction'
   --in (len_flat_histo, num_particles*3, length faction')
 
