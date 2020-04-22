@@ -8,7 +8,7 @@ import re
 
 def read_futhark_results(mem, rf, f):
     all_results = json.load(open(f))
-    hwd_results = all_results['prototype.fut:hwd']
+    hdw_results = all_results['prototype.fut:hdw']
     cas_results = all_results['prototype.fut:cas']
     xcg_results = all_results['prototype.fut:xcg']
 
@@ -19,7 +19,7 @@ def read_futhark_results(mem, rf, f):
             Hs[H] = int(np.mean(results['datasets'][dataset]['runtimes'])*1000)
         return Hs
 
-    return (on_results(hwd_results),
+    return (on_results(hdw_results),
             on_results(cas_results),
             on_results(xcg_results))
 
@@ -94,12 +94,12 @@ def table_for(what, f, fut):
 mem=sys.argv[1]
 rf=sys.argv[2]
 
-hwd_file='cuda-prototype/hwd_{}_{}.csv'.format(mem, rf)
+hdw_file='cuda-prototype/hdw_{}_{}.csv'.format(mem, rf)
 cas_file='cuda-prototype/cas_{}_{}.csv'.format(mem, rf)
 xcg_file='cuda-prototype/xcg_{}_{}.csv'.format(mem, rf)
 
-fut_hwd, fut_cas, fut_xcg = read_futhark_results(mem, rf, 'futhark/prototype.json')
+fut_hdw, fut_cas, fut_xcg = read_futhark_results(mem, rf, 'futhark/prototype.json')
 
-table_for('hwd', hwd_file, fut_hwd)
+table_for('hdw', hdw_file, fut_hdw)
 table_for('cas', cas_file, fut_cas)
 table_for('xcg', xcg_file, fut_xcg)
