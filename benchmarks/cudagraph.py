@@ -29,7 +29,7 @@ def read_futhark_results(rf, f):
             on_results(cas_results),
             on_results(xcg_results))
 
-def plot_lib(ax, f, mem, *args):
+def plot_lib(ax, f, mem, style):
     with open(f) as csvfile:
         rd = csv.DictReader(csvfile)
         Hs = list(map(int, rd.fieldnames[1:]))
@@ -40,7 +40,17 @@ def plot_lib(ax, f, mem, *args):
             label = M
             if label[0] in ['_', '=']:
                 label = '$M' + label + '$'
-            ax.plot(Hs, runtimes, label='{} ({})'.format(label, mem), *args)
+
+            w = 2
+
+            if label == 'Auto':
+                style = '-'
+                w = 4
+
+            ax.plot(Hs, runtimes,
+                    linestyle=style,
+                    linewidth=w,
+                    label='{} ({})'.format(label, mem))
 
 def plot_futhark(ax, res):
     Hs = sorted(res.keys())
@@ -79,36 +89,36 @@ def ax_props(ax, title, ylabel=False, xlabel=True):
 
 plot_lib(axes[0,0], hwd_shared_1_file, 'shared', ':')
 plot_lib(axes[0,0], hwd_global_1_file, 'global', '--')
-plot_futhark(axes[0,0], fut_hwd_1)
+# plot_futhark(axes[0,0], fut_hwd_1)
 ax_props(axes[0,0], 'HWD, RF=1', ylabel=True, xlabel=False)
 
 plot_lib(axes[0,1], cas_shared_1_file, 'shared', ':')
 plot_lib(axes[0,1], cas_global_1_file, 'global', '--')
-plot_futhark(axes[0,1], fut_cas_1)
+# plot_futhark(axes[0,1], fut_cas_1)
 ax_props(axes[0,1], 'CAS, RF=1', ylabel=False, xlabel=False)
 
 plot_lib(axes[0,2], xcg_shared_1_file, 'shared', ':')
 plot_lib(axes[0,2], xcg_global_1_file, 'global', '--')
-plot_futhark(axes[0,2], fut_xcg_1)
+#plot_futhark(axes[0,2], fut_xcg_1)
 ax_props(axes[0,2], 'XCG, RF=1', ylabel=False, xlabel=False)
 
 plot_lib(axes[1,0], hwd_shared_64_file, 'shared', ':')
 plot_lib(axes[1,0], hwd_global_64_file, 'global', '--')
-plot_futhark(axes[1,0], fut_hwd_64)
+# plot_futhark(axes[1,0], fut_hwd_64)
 ax_props(axes[1,0], 'HWD, RF=64', ylabel=True, xlabel=True)
 
 plot_lib(axes[1,1], cas_shared_64_file, 'shared', ':')
 plot_lib(axes[1,1], cas_global_64_file, 'global', '--')
-plot_futhark(axes[1,1], fut_cas_64)
+# plot_futhark(axes[1,1], fut_cas_64)
 ax_props(axes[1,1], 'CAS, RF=64', ylabel=True, xlabel=True)
 
 plot_lib(axes[1,2], xcg_shared_64_file, 'shared', ':')
 plot_lib(axes[1,2], xcg_global_64_file, 'global', '--')
-plot_futhark(axes[1,2], fut_xcg_64)
+# plot_futhark(axes[1,2], fut_xcg_64)
 ax_props(axes[1,2], 'XCG, RF=64', ylabel=True, xlabel=True)
 
 
-axes[0,0].legend(loc='upper center', framealpha=1, ncol=7, fancybox=False,
+axes[0,0].legend(loc='upper center', framealpha=1, ncol=6, fancybox=False,
                  bbox_to_anchor=(1.75, 1.35))
 
 plt.savefig(outputfile, bbox_inches='tight')
