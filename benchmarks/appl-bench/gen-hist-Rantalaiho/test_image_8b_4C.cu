@@ -167,19 +167,30 @@ static void testHistogram(uint4* INPUT, uint4* hostINPUT, int nPixels,  bool pri
   test_xformChannel<2> blueChannel;
   test_xformChannel<3> alphaChannel;
 
-  int* tmpres = (int*)malloc(sizeof(int) * nIndex);
+  int* tmpres = NULL;
+#if 0
+  tmpres = (int*)malloc(sizeof(int) * nIndex);
   int* cpures = tmpres;
   int* redres = &tmpres[0];
   int* greenres = &tmpres[TESTMAXIDX];
   int* blueres = &tmpres[TESTMAXIDX*2];
   int* alphares = &tmpres[TESTMAXIDX*3];
+  memset(tmpres, 0, sizeof(int) * nIndex);
+#endif
   int zero = 0;
   {
     {
       if (print)
         printf("\nTest reduce_by_key:\n\n");
-      memset(tmpres, 0, sizeof(int) * nIndex);
-      if (cpurun)
+      
+      if (cpurun) {
+        tmpres = (int*)malloc(sizeof(int) * nIndex);
+        int* cpures = tmpres;
+        int* redres = &tmpres[0];
+        int* greenres = &tmpres[TESTMAXIDX];
+        int* blueres = &tmpres[TESTMAXIDX*2];
+        int* alphares = &tmpres[TESTMAXIDX*3];
+        memset(tmpres, 0, sizeof(int) * nIndex);
         for (int i = 0; i < (nPixels >> 2); i++)
         {
           int index[4];
@@ -199,9 +210,7 @@ static void testHistogram(uint4* INPUT, uint4* hostINPUT, int nPixels,  bool pri
 
           //printf("i = %d,  out_index = %d,  out_val = (%.3f, %.3f) \n",i, index, tmp.real, tmp.imag);
         }
-      if (print && cpurun)
-      {
-          printres(cpures, nIndex, "CPU results:");
+        if(print)  printres(cpures, nIndex, "CPU results:");
       }
     }
 
@@ -242,7 +251,9 @@ static void testHistogram(uint4* INPUT, uint4* hostINPUT, int nPixels,  bool pri
     }
 
   }
+#if 0
   free(tmpres);
+#endif
 }
 
 #if ENABLE_THRUST
@@ -358,6 +369,19 @@ static void fillInput(int* input, const char* filename, int nPixels, bool ch4)
       }
       fclose(file);
   }
+}
+
+
+#include <sys/time.h>
+#include <time.h>
+
+int timeval_subtract(struct timeval *result, struct timeval *t2, struct timeval *t1)
+{
+  unsigned int resolution=1000000;
+  long int diff = (t2->tv_usec + resolution * t2->tv_sec) - (t1->tv_usec + resolution * t1->tv_sec);
+  result->tv_sec = diff / resolution;
+  result->tv_usec = diff % resolution;
+  return (diff<0);
 }
 
 
@@ -519,7 +543,12 @@ int main (int argc, char** argv)
     }
 
     // Now start timer - we run on stream 0 (default stream):
+    print = false;
     cudaEventRecord(start, 0);
+
+        double elapsed;
+        struct timeval t_start, t_end, t_diff;
+        gettimeofday(&t_start, NULL);
 
     for (i = 0; i < NRUNS; i++)
     {
@@ -539,7 +568,13 @@ int main (int argc, char** argv)
       print = false;
       // Run only once all stress-tests
     }
-    
+
+        cudaThreadSynchronize();    
+        gettimeofday(&t_end, NULL);
+        timeval_subtract(&t_diff, &t_end, &t_start);
+        elapsed = (t_diff.tv_sec*1e6+t_diff.tv_usec); 
+
+
     {
         float t_ms;
         cudaEventRecord(stop, 0);
@@ -547,7 +582,7 @@ int main (int argc, char** argv)
         cudaEventElapsedTime(&t_ms, start, stop);
         double t = t_ms * 0.001f;
         double GKps = (((double)nPixels * (double)NRUNS * 4.0)) / (t*1.e9);
-        printf("Average Runtime per loop iteration: %fs, Thoughput (Gkeys/s): %3f GK/s \n", t/NRUNS, GKps);
+        printf("Average Runtime per loop iteration: %fs %fmicrosecs, Thoughput (Gkeys/s): %3f GK/s \n", t/NRUNS, elapsed/NRUNS, GKps);
     }
 
     if (INPUT) cudaFree(INPUT);
