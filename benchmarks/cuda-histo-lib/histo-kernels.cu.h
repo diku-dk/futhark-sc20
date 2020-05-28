@@ -25,11 +25,11 @@ atomADDi32(volatile uint32_t* loc_hists, volatile int* locks, int idx, uint32_t 
     return atomicAdd((uint32_t*)&loc_hists[idx], v);
 }
 
-#if 0
+#if 1
 // WHY doesn't this compiles???
 __device__ inline static float
 atomADDf32(volatile float* loc_hists, volatile int* locks, int idx, float v) {
-    return atomicAdd(&loc_hists[idx], v);
+    return atomicAdd((float*)&loc_hists[idx], v);
 }
 #endif
 
