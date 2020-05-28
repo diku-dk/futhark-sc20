@@ -287,7 +287,7 @@ struct ArgMaxI64 {
 
 
 template<int RF>
-void runLocalMemDataset(int32_t* h_input, uint32_t* h_histo, int32_t* d_input, int32_t N,
+void runLocalMemDataset(int32_t* h_input, uint32_t* h_histo, int32_t* d_input, const int32_t N,
                         const char *hwd_csv, const char *cas_csv, const char *xcg_csv) {
     const int num_histos = 8;
     const int num_m_degs = 1;
@@ -331,79 +331,39 @@ void runLocalMemDataset(int32_t* h_input, uint32_t* h_histo, int32_t* d_input, i
     }
 }
 
-#if 0
-void runGlobalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, const int RF, const int N,
+template<int RF>
+void runGlobalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, const int32_t N,
                         const char *hwd_csv, const char *cas_csv, const char *xcg_csv) {
     const int B = 256;
     const int T = NUM_THREADS(N);
     const int num_histos = 7;
-    const int num_m_degs = 6;
-    const int algn = 1;
+    const int num_m_degs = 1;
     const int histo_sizes[num_histos] = { 12281,  24569,  49145
                                         , 196607, 393215, 786431, 1572863 };
                                         //{ 1*12*1024-algn,  2*12*1024-algn,  4*12*1024-algn
                                         //, 8*12*1024-algn, 16*12*1024-algn, 32*12*1024-algn
                                         //, 64*12*1024-algn, 128*12*1024-algn };
-    const int subhisto_degs[num_m_degs] = { 1, 4, 8, 16, 32, 33 };    
+    const int subhisto_degs[num_m_degs] = { 33 };    
     unsigned long runtimes[3][num_histos][num_m_degs];
 
     for(int i=0; i<num_histos; i++) {
         const int H = histo_sizes[i];
 
-        { // For ADD
-            goldSeqHisto<ADD>(RF, N, H, h_input, h_histo);
-
-            for(int j=0; j<num_m_degs; j++) {
-                int M_add, num_chunks_add;
-                if(j == num_m_degs-1) {
-                    autoGlbChunksSubhists(ADD, RF, H, N, T, L2Cache, &M_add, &num_chunks_add);
-                } else {
-                    num_chunks_add = 1; M_add = subhisto_degs[j];
-                }
-                if(j==(num_m_degs-1))
-                    printf("Our M_add: %d, num_chunks_add: %d, for H: %d\n", M_add, num_chunks_add, H);
-
-                runtimes[0][i][j] = glbMemHwdAddCoop(ADD, RF, N, H, B, M_add, num_chunks_add, d_input, h_histo);
-            }
+        { // For HWD
+        	goldSeqHisto< AddI32<RF> >(N, H, h_input, (int32_t*)h_histo);
+        	runtimes[0][i][0] = glbmemHistoRunValid< AddI32<RF> >( GPU_RUNS, B, RF, H, N, d_input, (int32_t*)h_histo);
         }
 
-        { // For CAS
-            goldSeqHisto<CAS>(RF, N, H, h_input, h_histo);
-
-            for(int j=0; j<num_m_degs; j++) {
-                int M_cas, num_chunks_cas;
-                if(j == num_m_degs-1) {
-                    autoGlbChunksSubhists(CAS, RF, H, N, T, L2Cache, &M_cas, &num_chunks_cas);
-                } else {
-                    num_chunks_cas = 1; M_cas = subhisto_degs[j];
-                }
-                if(j==(num_m_degs-1))
-                    printf("Our M_cas: %d, num_chunks_cas: %d, for H: %d\n", M_cas, num_chunks_cas, H);
-
-                runtimes[1][i][j] = glbMemHwdAddCoop(CAS, RF, N, H, B, M_cas, num_chunks_cas, d_input, h_histo);
-            }
+        { // FOR CAS
+            goldSeqHisto< SatAdd24<RF> >(N, H, h_input, h_histo);
+            runtimes[1][i][0] = glbmemHistoRunValid< SatAdd24<RF> >( GPU_RUNS, B, RF, H, N, d_input, h_histo);
         }
 
-        { // For XCG
-            goldSeqHisto<XCG>(RF, N, H, h_input, h_histo);
-
-            for(int j=0; j<num_m_degs; j++) {
-                int M_lck, num_chunks_lck;
-                if(j == num_m_degs-1) {
-                    autoGlbChunksSubhists(XCG, RF, H, N, T, L2Cache, &M_lck, &num_chunks_lck);
-                } else {
-                    num_chunks_lck = 1; M_lck = (subhisto_degs[j]+2)/3;
-                }
-                if(j==(num_m_degs-1))
-                    printf("Our M_lck: %d, num_chunks_lck: %d, for H: %d\n", M_lck, num_chunks_lck, H);
-
-                runtimes[2][i][j] = glbMemHwdAddCoop(XCG, RF, N, H, B, M_lck, num_chunks_lck, d_input, h_histo);
-            }
+        { // FOR XHG
+            goldSeqHisto< ArgMaxI64<RF> >(N, H, h_input, (uint64_t*)h_histo);
+            runtimes[2][i][0] = glbmemHistoRunValid< ArgMaxI64<RF> >( GPU_RUNS, B, RF, H, N, d_input, (uint64_t*)h_histo);
         }
     }
-
-    printf("Running Histo in Global Mem: RACE_FACT: %d, STRIDE: %d, L2Cache:%d, L2Fract: %f\n",
-           RF, STRIDE, L2Cache, L2Fract);
 
     //printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RF);
     printLaTex<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RF);
@@ -418,7 +378,6 @@ void runGlobalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, const in
         printCSV(xcg_csv, 2, runtimes, histo_sizes, subhisto_degs, "=");
     }
 }
-#endif
 
 void usage(const char *prog) {
     fprintf(stderr, "Usage: %s <local|global>\n", prog);
@@ -472,7 +431,7 @@ int main(int argc, char **argv) {
  
     // 2. initialize host memory
     randomInit(h_input, INP_LEN);
-    zeroOut<uint32_t>(h_histo, Hmax);
+    zeroOut<SatAdd24<1> >(h_histo, Hmax);
     
     // 3. allocate device memory for input and copy from host
     int* d_input;
@@ -485,10 +444,11 @@ int main(int argc, char **argv) {
         runLocalMemDataset<63>(h_input, h_histo, d_input, INP_LEN,
                            	   hwd_csv_63, cas_csv_63, xcg_csv_63);
     } else {
-#if 0
-        runGlobalMemDataset(h_input, h_histo, d_input, RF, INP_LEN,
-                            hwd_csv, cas_csv, xcg_csv);
-#endif
+        runGlobalMemDataset<1> (h_input, h_histo, d_input, INP_LEN,
+                            	hwd_csv_1, cas_csv_1, xcg_csv_1);
+        runGlobalMemDataset<63>(h_input, h_histo, d_input, INP_LEN,
+                            	hwd_csv_63, cas_csv_63, xcg_csv_63);
+
     }
 
     // 7. clean up memory
