@@ -2,7 +2,6 @@
 
 import sys
 import csv
-import json
 import numpy as np
 import re
 import matplotlib

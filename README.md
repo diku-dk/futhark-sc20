@@ -25,6 +25,12 @@ The artifact is divided into three main parts:
 * The [benchmarks](benchmarks/) directory contains the benchmark
   programs used for Section IV in the paper.
 
+The artifact is designed as a bunch of Makefiles calling other
+scripts.  Generally, these Makefiles will produce data files with
+runtime results, and re-running `make` will not re-run the benchmarks,
+but only re-report the last results.  Use `make -B` (or `make clean`)
+to actually perform a re-run.
+
 ## Paper environment
 
 We have run the experiments in the paper on a server-class computer

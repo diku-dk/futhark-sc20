@@ -1,9 +1,11 @@
 include ../futhark.mk
 
+FUTHARK_BENCH_RUNS=10
+
 all: kmeans.json
 
 benchmark_data: benchmark_data.c
-	gcc -o $@ $< -O
+	gcc -o $@ $< -O -std=c99
 
 data: data/k1024.in data/k5.in
 

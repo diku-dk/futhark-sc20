@@ -18,4 +18,4 @@ histogram64.seconds histogram256.seconds: cuda-samples-orig
 .PHONY: clean
 
 clean:
-	rm -f *.json *.c cuda-samples
+	rm -f *.json *.c cuda-samples cuda-samples-orig *.seconds
