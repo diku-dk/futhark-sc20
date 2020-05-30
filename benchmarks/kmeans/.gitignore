@@ -2,3 +2,4 @@ kmeans
 kmeans.c
 kmeans.json
 data/
+benchmark_data
