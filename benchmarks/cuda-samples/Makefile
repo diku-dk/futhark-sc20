@@ -1,4 +1,4 @@
-include ../makefile.mk
+include ../futhark.mk
 
 all: cuda-samples.json
 
