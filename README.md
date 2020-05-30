@@ -6,9 +6,7 @@ reproduction should be as easy as compiling and running them. Most of
 the GPU code is written in ordinary CUDA, but some is written in
 Futhark, the data-parallel language that is also partially the subject
 of the paper. An appropriate version of the Futhark compiler is also
-needed. The paper results have been produced with an unreleased
-version with Git commit dedcd227257175bdffb4f24ca49d79b72205089b (but
-which was released as 0.15.5).
+needed. The paper results have been produced with Futhark 0.15.8.
 
 Each directory of this artifact contains a `README.md` explaining the
 use of its contents (or a link to further information).

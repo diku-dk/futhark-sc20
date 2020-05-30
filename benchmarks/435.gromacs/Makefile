@@ -1,5 +1,13 @@
 include ../futhark.mk
 
-run:
-	futhark bench --backend=$(BACKEND) $(OPTIONS) -r 5000 inl1100-6perit.fut --json inl1100-6perit.json
-	futhark bench --backend=$(BACKEND) $(OPTIONS) -r 5000 inl1100-withscan.fut --json inl1100-withscan.json
+run: gromacs-inl1100-hwd.json gromacs-inl1100-cas.json
+
+gromacs-inl1100-hwd.json: gromacs-inl1100-hwd.fut
+	$(FUTHARK) bench --backend=$(FUTHARK_BACKEND) $(FUTHARK_BENCH_OPTIONS) -r 5000 $< --json $@
+
+# Always OpenCL to ensure that we floating-point addition is done with a CAS.
+gromacs-inl1100-cas.json: gromacs-inl1100-cas.fut
+	$(FUTHARK) bench --backend=opencl $(FUTHARK_BENCH_OPTIONS) -r 5000 $< --json $@
+
+.PHONY: clean
+	rm -f *.json

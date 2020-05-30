@@ -1,3 +1,5 @@
+.NOTPARALLEL:
+
 COMPILER?=nvcc
 CFLAGS?=-O3 --compiler-options=-Wall
 LDFLAGS?=-lOpenCL
@@ -12,8 +14,6 @@ $(PROGRAM): histo-main.cu histo-wrap.cu.h histo-kernels.cu.h
 	$(COMPILER) $(CFLAGS) -o $(PROGRAM) histo-main.cu
 
 run: hdw_local_1.csv hdw_global_1.csv hdw_local_63.csv hdw_global_63.csv
-
-.NOTPARALLEL:
 
 hdw_local_1.csv cas_local_1.csv xcg_local_1.csv: $(PROGRAM)
 	./$(PROGRAM) local 1 hdw_local_1.csv cas_local_1.csv xcg_local_1.csv

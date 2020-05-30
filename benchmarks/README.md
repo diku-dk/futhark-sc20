@@ -28,3 +28,10 @@ packaged.
 * [cuda-samples](cuda-samples/) contains a Futhark implementation of
   the CUDA SDK samples of histograms, corresponding to section IV.D.3
   and part of Table III.
+
+## Running
+
+Running `make` in this directory will produce human-readable runtime
+numbers **for the Futhark implementations only**.  To compare with
+reference implementations (when applicable), run `make` in each
+directory separately.
