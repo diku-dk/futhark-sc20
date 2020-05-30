@@ -6,10 +6,10 @@ PROGRAM=genhisto
 
 .PHONY: clean all run
 
+all: table_7.pdf
+
 $(PROGRAM): histo-main.cu histo-wrap.cu.h histo-kernels.cu.h
 	$(COMPILER) $(CFLAGS) -o $(PROGRAM) histo-main.cu
-
-all: table_7.pdf
 
 run: hdw_local_1.csv hdw_global_1.csv hdw_local_63.csv hdw_global_63.csv
 
