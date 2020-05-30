@@ -36,19 +36,19 @@ def plot_lib(ax, f, mem, style):
 
 _, outputfile = sys.argv
 
-hdw_shared_1_file='cuda-prototype/hdw_local_1.csv'
-hdw_global_1_file='cuda-prototype/hdw_global_1.csv'
-cas_shared_1_file='cuda-prototype/cas_local_1.csv'
-cas_global_1_file='cuda-prototype/cas_global_1.csv'
-xcg_shared_1_file='cuda-prototype/xcg_local_1.csv'
-xcg_global_1_file='cuda-prototype/xcg_global_1.csv'
+hdw_shared_1_file='hdw_local_1.csv'
+hdw_global_1_file='hdw_global_1.csv'
+cas_shared_1_file='cas_local_1.csv'
+cas_global_1_file='cas_global_1.csv'
+xcg_shared_1_file='xcg_local_1.csv'
+xcg_global_1_file='xcg_global_1.csv'
 
-hdw_shared_63_file='cuda-prototype/hdw_local_63.csv'
-hdw_global_63_file='cuda-prototype/hdw_global_63.csv'
-cas_shared_63_file='cuda-prototype/cas_local_63.csv'
-cas_global_63_file='cuda-prototype/cas_global_63.csv'
-xcg_shared_63_file='cuda-prototype/xcg_local_63.csv'
-xcg_global_63_file='cuda-prototype/xcg_global_63.csv'
+hdw_shared_63_file='hdw_local_63.csv'
+hdw_global_63_file='hdw_global_63.csv'
+cas_shared_63_file='cas_local_63.csv'
+cas_global_63_file='cas_global_63.csv'
+xcg_shared_63_file='xcg_local_63.csv'
+xcg_global_63_file='xcg_global_63.csv'
 
 fig, axes = plt.subplots(2,3, figsize=(10,5))
 plt.subplots_adjust(hspace=0.3)
