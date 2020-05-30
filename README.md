@@ -32,4 +32,4 @@ The artifact is divided into three main parts:
 We have run the experiments in the paper on a server-class computer
 with an Intel(R) Xeon(R) CPU E5-2650 v2 CPU, but more importantly an
 NVIDIA RTX 2080 Ti GPU. The operating system was RHEL 7.7 and we used
-CUDA 10.1 for the GPU interaction.
+CUDA 10.1 for the GPU interaction.  You will need a UTF-8 locale.

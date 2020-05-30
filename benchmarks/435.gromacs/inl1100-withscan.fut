@@ -19,11 +19,11 @@ import "util"
 -- nbfp : [2*ntype*ntype]
 entry main  [nri] [nrip1] [nrj] [num_particles]
             (jindex: [nrip1]i32) (iinr: [nri]i32) (jjnr: [nrj]i32)
-            (shift: [nri]i32) (types: [num_particles]i32) 
+            (shift: [nri]i32) (types: [num_particles]i32)
             (ntype: i32) (facel: real)
             (shiftvec: []real) (pos: []real) (faction: []real)
             (charge: []real) (nbfp: []real) : []real =
-
+  #[unsafe]
   -- building helper structures for flattening!
   let len_flat = jindex[nri]
   let flag= scatter (replicate len_flat 0i8) (jindex[:nri]) (replicate nri 1i8)
@@ -39,7 +39,7 @@ entry main  [nri] [nrip1] [nrj] [num_particles]
             let ii                = iinr[n]          -- temporary
             let ii3               = 3*ii             -- cheap to recompute 3*ii
             --let nj0               = jindex[n]      -- already in jindex
-            --let nj1               = jindex[n+1]      
+            --let nj1               = jindex[n+1]
             let ix1               = shX + pos[ii3]   -- save
             let iy1               = shY + pos[ii3+1] -- save
             let iz1               = shZ + pos[ii3+2] -- save
@@ -81,8 +81,6 @@ entry main  [nri] [nrip1] [nrj] [num_particles]
   let H = num_particles
   let RF = ( calcRF (ext_jnrs[15*H: 16*H]) + calcRF (ext_jnrs[30*H: 31*H]) ) / 2 + 1
 
-  -- let fixyz1 = reduce_comm (\[a1,b1,c1] [a2,b2,c2] -> [a1+a2, b1+b2, c1+c2] )
-  --                          [nul, nul, nul] txyz11s2D
   let scaned_txyzs = sgmscan (\ (a1,b1,c1) (a2,b2,c2) -> (a1+a2, b1+b2, c1+c2))
                              (nul, nul, nul) flag txyz11s2Ds
   let (fix1s, fiy1s, fiz1s) = unzip3 <| map (\ b -> scaned_txyzs[b-1] ) jindex[1:]
@@ -109,8 +107,3 @@ entry main  [nri] [nrip1] [nrj] [num_particles]
 
   let faction' = reduce_by_index_rf 79i32 (copy faction) (+) nul hist_inds hist_vals
   in  faction'
-  --in (len_flat_histo, num_particles*3, length faction')
-
---futhark bench --backend=opencl --pass-option=--default-num-groups=144 --pass-option=--default-group-size=256 -r 1000 inl1100-withscan.fut
--- ./inl1100-withscan -t /dev/stderr -D --default-num-groups=144 --default-group-size=256 < data/all-huge.in > /dev/null
-
