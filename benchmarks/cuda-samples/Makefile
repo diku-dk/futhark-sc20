@@ -1,4 +1,4 @@
-include ../common.mk
+include ../makefile.mk
 
 all: cuda-samples.json
 

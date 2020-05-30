@@ -1,4 +1,4 @@
-include ../common.mk
+include ../futhark.mk
 
 all: prototype.json
 
