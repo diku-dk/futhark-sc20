@@ -120,35 +120,6 @@ void printTextTab( const unsigned long runtimes[3][num_histos][num_m_degs]
 }
 
 template<int num_histos, int num_m_degs>
-void printLaTex( const unsigned long runtimes[3][num_histos][num_m_degs]
-               , const int histo_sizes[num_histos]
-               , const int kms[num_m_degs]
-               , const int R) {
-    for(int k=0; k<3; k++) {
-        printf("\\begin{tabular}{|l|l|l|l|l|l|l|l|}\\hline\n");
-        if     (k==0) printf("ADD, R=%d", R);
-        else if(k==1) printf("CAS, R=%d", R);
-        else if(k==2) printf("XCG, R=%d", R);
-
-        for(int i = 0; i<num_histos; i++) { printf("\t& H=%d", histo_sizes[i]); }
-        printf("\\\\\\hline\n");
-        for(int j=0; j<num_m_degs; j++) {
-            if      (j==0)             printf("M=1 ");
-            else if (j < num_m_degs-1) printf("M=%d", kms[j]);
-            else                       printf("Ours");
-
-            for(int i = 0; i<num_histos; i++) {
-                printf("\t& %3.2f", runtimes[k][i][j]/1000.0);
-            }
-            printf("\\\\");
-            if(j == (num_m_degs-1)) printf("\\hline");
-            printf("\n");
-        }
-        printf("\\end{tabular}\n");
-    }
-}
-
-template<int num_histos, int num_m_degs>
 void printCSV(const char *csv, int k,
               const unsigned long runtimes[3][num_histos][num_m_degs],
               const int histo_sizes[num_histos],
@@ -317,8 +288,7 @@ void runLocalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, int RF, i
 
     }
 
-    //printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, ks, RF);
-    printLaTex<num_histos,num_m_degs>  (runtimes, histo_sizes, ks, RF);
+    printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, ks, RF);
 
     if (hwd_csv) {
         printCSV(hwd_csv, 0, runtimes, histo_sizes, ks, "_");
@@ -404,8 +374,7 @@ void runGlobalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, const in
     printf("Running Histo in Global Mem: RACE_FACT: %d, STRIDE: %d, L2Cache:%d, L2Fract: %f\n",
            RF, STRIDE, L2Cache, L2Fract);
 
-    //printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RF);
-    printLaTex<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RF);
+    printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RF);
 
     if (hwd_csv) {
         printCSV(hwd_csv, 0, runtimes, histo_sizes, subhisto_degs, "=");
