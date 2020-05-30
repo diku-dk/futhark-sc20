@@ -105,5 +105,9 @@ entry main  [nri] [nrip1] [nrj] [num_particles]
                  in  (ind, vla)
         ) (iota len_flat_histo)
 
-  let faction' = reduce_by_index_rf 79i32 (copy faction) (+) nul hist_inds hist_vals
+  -- Single-precision addition, but written such that the Futhark
+  -- compiler cannot recognise it and turn it into a HWD atomic.
+  let add_f32_cas (x: f32) (y: f32) = opaque x + opaque y
+
+  let faction' = reduce_by_index_rf 79i32 (copy faction) add_f32_cas nul hist_inds hist_vals
   in  faction'
