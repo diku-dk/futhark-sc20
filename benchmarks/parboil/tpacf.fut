@@ -1,10 +1,6 @@
 -- An implementation of the tpacf benchmark from the parboil benchmark suite
 --
 -- ==
--- compiled input @ tpacf-data/small.in.gz
--- output @ tpacf-data/small.out
--- compiled input @ tpacf-data/medium.in.gz
--- output @ tpacf-data/medium.out
 -- compiled input @ tpacf-data/large.in.gz
 -- output @ tpacf-data/large.out
 

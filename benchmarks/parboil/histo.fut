@@ -6,8 +6,6 @@
 -- ==
 -- compiled input @ histo-data/default.in.gz
 -- output @ histo-data/default.out.gz
--- compiled input @ histo-data/large.in.gz
--- output @ histo-data/large.out.gz
 
 let sat_add_u8 (x: i32) (y: i32): i32 =
   if x + y > i32.u8 u8.highest then i32.u8 u8.highest else x + y
