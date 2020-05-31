@@ -1,9 +1,9 @@
 gromacs-inl1100
 gromacs-inl1100.c
 gromacs-inl1100.json
-gromacs-inl1100-hwd
-gromacs-inl1100-hwd.c
-gromacs-inl1100-hwd.json
+gromacs-inl1100-hdw
+gromacs-inl1100-hdw.c
+gromacs-inl1100-hdw.json
 gromacs-inl1100-cas
 gromacs-inl1100-cas.c
 gromacs-inl1100-cas.json

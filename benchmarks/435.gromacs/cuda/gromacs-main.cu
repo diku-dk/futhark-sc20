@@ -52,7 +52,7 @@ const real twelve  = 12.0;
 
 
 void usage(const char *prog) {
-    fprintf(stderr, "Usage: %s <input-file> <nri_max> <nrj_max> <num_particles_max>\n", prog);
+    fprintf(stderr, "Usage: %s <input-file> <nri_max> <nrj_max> <num_particles_max> [output_file]\n", prog);
     exit(1);
 }
 
@@ -64,7 +64,7 @@ void usage(const char *prog) {
 // nvcc -O4 -arch=compute_35 -prec-sqrt=true gromacs-main.cu
 // ./a.out data/huge-indarr.txt.in 36000 1600000 32000
 int main(int argc, char **argv) {
-    if (argc != 5) {
+    if (argc != 5 && argc != 6) {
         usage(argv[0]);
     }
 
@@ -225,12 +225,19 @@ int main(int argc, char **argv) {
                               , shiftvec_d, pos_d, faction0_d, faction_d
                               , charge_d, nbfp_d, faction );
 #if WITH_HDW
-        printf("Cuda HWD timing for version using 6 atomic adds per inner iteration: %lu microseconds to run!\n"
+        printf("CUDA HWD timing for version using 6 atomic adds per inner iteration: %lu microseconds to run!\n"
               , elapsed_cuda_allhist);
 #else
-        printf("Cuda CAS timing for version using 6 atomic adds per inner iteration: %lu microseconds to run!\n"
+        printf("CUDA CAS timing for version using 6 atomic adds per inner iteration: %lu microseconds to run!\n"
               , elapsed_cuda_allhist);
 #endif
+
+        if (argc == 6) {
+          printf("Writing runtine to %s\n", argv[5]);
+          FILE *f = fopen(argv[5], "w");
+          fprintf(f, "%f\n", elapsed_cuda_allhist/1e6);
+          fclose(f);
+        }
     }
 
     { // free cuda and hoist memory
