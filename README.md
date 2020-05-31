@@ -41,6 +41,9 @@ to actually perform a re-run.
 
 * Python 3 with NumPy and Matplotlib.
 
+* Enough LaTeX for Matplotlib's LaTeX backend to work.  On most Linux
+  distributions, the "`texlive-full`" package will suffice.
+
 * `make` must refer to GNU Make.
 
 * An approriate version of `futhark` (0.15.6 or later) must be on the
