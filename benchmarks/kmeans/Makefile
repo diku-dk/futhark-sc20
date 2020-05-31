@@ -4,7 +4,13 @@ FUTHARK_BENCH_RUNS=10
 
 KMCUDA=kmcuda-6.2.3
 
+# Some old systems in wide use (RHEL...) require 'cmake3' to access
+# cmake version 3.  Let's hack this.
+ifeq ($(shell which cmake3),)
+CMAKE=cmake
+else
 CMAKE=cmake3
+endif
 
 KMCUDA_CUDA_ARCH=75
 
@@ -38,7 +44,7 @@ $(KMCUDA)/src/libKMCUDA.so: v6.2.3.tar.gz
 	tar xf $<
 	sed 's/-Werror//' -i $(KMCUDA)/src/CMakeLists.txt
 	(cd $(KMCUDA)/src && \
-	 $(CMAKE) . -D DISABLE_PYTHON=y -D DISABLE_R=y -D CUDA_ARCH=$(KMCUDA_CUDA_ARCH) && \
+	 $(CMAKE) . -DDISABLE_PYTHON=y -DDISABLE_R=y -DCUDA_ARCH=$(KMCUDA_CUDA_ARCH) && \
 	 make -j)
 
 v6.2.3.tar.gz:

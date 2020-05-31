@@ -46,6 +46,10 @@ to actually perform a re-run.
 
 * `make` must refer to GNU Make.
 
+* CMake version 3 must be available as either `cmake3` or `cmake` (the
+  tooling will prefer the former, which is what it's called on RHEL
+  7).
+
 * An approriate version of `futhark` (0.15.6 or later) must be on the
   shell `PATH`.  Run `make bin/futhark` in this directory to unpack a
   statically linked binary that will be automatically picked up by the
