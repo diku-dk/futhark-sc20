@@ -1,6 +1,12 @@
 # Common Makefile options used by Futhark implementations.
 
-FUTHARK=futhark
+LOCAL_FUTHARK=$(shell [ -x ../../bin/futhark ] && echo yes)
+
+ifeq ($(LOCAL_FUTHARK),yes)
+	FUTHARK=../../bin/futhark
+else
+	FUTHARK=futhark
+endif
 
 FUTHARK_BACKEND=cuda
 
