@@ -69,7 +69,6 @@ bool validate(uint64_t* A, uint64_t* B, uint32_t H) {
         printf("INVALID RESULT %d (%lu,%lu)\n", i, A[i], B[i]);
         return false;
       }
-    printf("VALID RESULT!\n");
     return true;
 }
 
@@ -177,15 +176,13 @@ double sortRedByKeyCUB( uint32_t* data_keys_in,  uint64_t* data_vals_in
 
 
 int main (int argc, char * argv[]) {
-    if (argc != 3) {
-        printf("Usage: %s <histogram size> <image size>\n", argv[0]);
+    if (argc != 3 && argc != 4) {
+        printf("Usage: %s <N> <H>\n", argv[0]);
         exit(1);
     }
     const uint32_t N = atoi(argv[1]);
     const uint32_t H = atoi(argv[2]);
-#ifdef WITH_PRINT
-    printf("Computing for image size: %d and histogram size: %d\n", N, H);
-#endif
+
     //Allocate and Initialize Host data with random values
     uint32_t* h_keys  = (uint32_t*) malloc(N*sizeof(uint32_t));
     uint64_t* h_vals  = (uint64_t*) malloc(N*sizeof(uint64_t));
@@ -193,20 +190,7 @@ int main (int argc, char * argv[]) {
     uint64_t* g_histo = (uint64_t*) malloc(H*sizeof(uint64_t));
     randomInit(h_keys, h_vals, N, H);
 
-    { // golden sequential histogram
-        double elapsed;
-        struct timeval t_start, t_end, t_diff;
-        gettimeofday(&t_start, NULL);
-
-        histoGold(h_keys, h_vals, N, H, g_histo);
-
-        gettimeofday(&t_end, NULL);
-        timeval_subtract(&t_diff, &t_end, &t_start);
-        elapsed = (t_diff.tv_sec*1e6+t_diff.tv_usec);
-#ifdef WITH_PRINT 
-        printf("Golden (Sequential) Key-Uint64 ArgMin Histogram runs in: %.2f microsecs\n", elapsed);
-#endif
-    }
+    histoGold(h_keys, h_vals, N, H, g_histo);
 
     //Allocate and Initialize Device data
     uint32_t* d_keys;
@@ -218,22 +202,20 @@ int main (int argc, char * argv[]) {
     cudaMemcpy(d_keys, h_keys, N * sizeof(uint32_t), cudaMemcpyHostToDevice);
     cudaMemcpy(d_vals, h_vals, N * sizeof(uint64_t), cudaMemcpyHostToDevice);
 
-    double elapsed = 
+    double elapsed =
       sortRedByKeyCUB ( d_keys,  d_vals, d_histo, N, H );
 
     cudaMemcpy(h_histo, d_histo, H*sizeof(uint64_t), cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
     cudaCheckError();
-#ifdef WITH_PRINT
-    printf("CUB Key-Uint64 ArgMin Histogram ... ");
-#endif
     bool success = validate(g_histo, h_histo, H);
 
-    printf("CUB Key-Uint64 ArgMin Histogram H=%d runs in: %.2f microsecs\n", H, elapsed);
-    double gigaBytesPerSec = N * (sizeof(uint32_t) + 3*sizeof(uint64_t)) * 1.0e-3f / elapsed; 
-#ifdef WITH_PRINT
-    printf("CUB Key-Uint64 ArgMin Histogram GBytes/sec = %.2f!\n", gigaBytesPerSec); 
-#endif
+    printf("CUB XCG Histogram for N=%d, H=%d runs in: %.2f us\n", N, H, elapsed);
+
+    if (argc == 4) {
+      writeRuntime(argv[3], elapsed);
+    }
+
     // Cleanup and closing
     cudaFree(d_keys); cudaFree(d_vals); cudaFree(d_histo);
     free(h_keys);  free(h_vals); free(g_histo); free(h_histo);

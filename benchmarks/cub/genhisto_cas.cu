@@ -17,7 +17,6 @@ bool validateZ(Z* A, Z* B, uint32_t sizeAB) {
         printf("INVALID RESULT %d (%d, %d)\n", i, A[i], B[i]);
         return false;
       }
-    printf("VALID RESULT!\n");
     return true;
 }
 
@@ -124,7 +123,7 @@ double sortRedByKeyCUB( uint32_t* data_keys_in, uint32_t* histo
     // timing
     double elapsed;
     struct timeval t_start, t_end, t_diff;
-    gettimeofday(&t_start, NULL); 
+    gettimeofday(&t_start, NULL);
 
     for(int k=0; k<GPU_RUNS; k++) {
 #if 0
@@ -161,7 +160,7 @@ double sortRedByKeyCUB( uint32_t* data_keys_in, uint32_t* histo
     cudaFree(tmp_red_mem);
     cudaFree(data_keys_out);
     cudaFree(data_vals);
-    cudaFree(unique_keys); 
+    cudaFree(unique_keys);
     cudaFree(num_segments);
 
     return elapsed;
@@ -169,35 +168,20 @@ double sortRedByKeyCUB( uint32_t* data_keys_in, uint32_t* histo
 
 
 int main (int argc, char * argv[]) {
-    if (argc != 3) {
-        printf("Usage: %s <image size> <histogram size>\n", argv[0]);
+    if (argc != 3 && argc != 4) {
+        printf("Usage: %s <N> <H>\n", argv[0]);
         exit(1);
     }
     const uint32_t N = atoi(argv[1]);
     const uint32_t H = atoi(argv[2]);
-#ifdef WITH_PRINT
-    printf("Computing for image size: %d and histogram size: %d\n", N, H);
-#endif
+
     //Allocate and Initialize Host data with random values
     uint32_t* h_keys  = (uint32_t*) malloc(N*sizeof(uint32_t));
     uint32_t* h_histo = (uint32_t*) malloc(H*sizeof(uint32_t ));
     uint32_t* g_histo = (uint32_t*) malloc(H*sizeof(uint32_t ));
     randomInitNat(h_keys, N, H);
 
-    { // golden sequential histogram
-        double elapsed;
-        struct timeval t_start, t_end, t_diff;
-        gettimeofday(&t_start, NULL);
-
-        histoGold(h_keys, N, H, g_histo);
-
-        gettimeofday(&t_end, NULL);
-        timeval_subtract(&t_diff, &t_end, &t_start);
-        elapsed = (t_diff.tv_sec*1e6+t_diff.tv_usec); 
-#ifdef WITH_PRINT
-        printf("Golden (Sequential) Uint24-Saturated-Add Histogram runs in: %.2f microsecs\n", elapsed);
-#endif
-    }
+    histoGold(h_keys, N, H, g_histo);
 
     //Allocate and Initialize Device data
     uint32_t* d_keys;
@@ -211,16 +195,14 @@ int main (int argc, char * argv[]) {
     cudaMemcpy(h_histo, d_histo, H*sizeof(uint32_t), cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
     cudaCheckError();
-#ifdef WITH_PRINT
-    printf("CUB Uint24-Saturated-Add Histogram ... ");
-#endif
     bool success = validateZ<uint32_t>(g_histo, h_histo, H);
 
-    printf("CUB Uint24-Saturated-Add Histogram H=%d runs in: %.2f microsecs\n", H, elapsed);
-    double gigaBytesPerSec = N * (sizeof(uint32_t) + 2*sizeof(uint32_t)) * 1.0e-3f / elapsed; 
-#ifdef WITH_PRINT
-    printf("CUB Uint24-Saturated-Add Histogram GBytes/sec = %.2f!\n", gigaBytesPerSec); 
-#endif
+    printf("CUB CAS Histogram for N=%d, H=%d runs in: %.2f us\n", N, H, elapsed);
+
+    if (argc == 4) {
+      writeRuntime(argv[3], elapsed);
+    }
+
     // Cleanup and closing
     cudaFree(d_keys); cudaFree(d_histo);
     free(h_keys); free(g_histo); free(h_histo);

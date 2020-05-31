@@ -39,6 +39,8 @@ to actually perform a re-run.
 
 * Python 3 with NumPy and Matplotlib.
 
+* `make` must refer to GNU Make.
+
 ## Paper environment
 
 We have run the experiments in the paper on a server-class computer

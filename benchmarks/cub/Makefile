@@ -1,16 +1,29 @@
-CXX        = nvcc -O3
-CUB?="../../../cub-1.8.0/cub"
+include ../futhark.mk
 
-EXECUTABLES=genhisto_i32 genhisto_i32_sat genhisto_f64 genhisto_argmin
+CUB=cub-1.8.0
 
-all: $(EXECUTABLES)
+all: cub-hdw.csv cub-cas.csv cub-xcg.csv histograms.json
+	python3 report.py
 
-.cu.o: $(SRC) $(HELPERS)
-	$(CXX) -I$(CUB) -c $@ $<
+cub-hdw.csv: genhisto_hdw
+	./cub-bench.sh ./genhisto_hdw > $@
 
-%: %.cu *.h
-	$(CXX) -I$(CUB) -o $@ $<
+cub-cas.csv: genhisto_cas
+	./cub-bench.sh ./genhisto_cas > $@
+
+cub-xcg.csv: genhisto_xcg
+	./cub-bench.sh ./genhisto_xcg > $@
+
+%: %.cu *.h $(CUB)
+	nvcc -I$(CUB)/cub -o $@ $<
+
+cub-1.8.0: | 1.8.0.tar.gz
+	tar xf 1.8.0.tar.gz
+
+1.8.0.tar.gz:
+	wget https://github.com/NVlabs/cub/archive/1.8.0.tar.gz
 
 clean:
-	rm -f $(EXECUTABLES) *.o
-
+	rm -f genhisto_cas genhisto_hdw genhisto_xcg *.csv
+	rm -rf cub-1.8.0
+	rm -f 1.8.0.tar.gz

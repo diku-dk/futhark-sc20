@@ -1,6 +1,7 @@
 #ifndef HISTO_HELPER
 #define HISTO_HELPER
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -49,6 +50,13 @@ inline uint32_t ceilLog2(uint32_t H) {
         pow2_val *= 2;
     }
     return log2_val;
+}
+
+void writeRuntime(const char *fname, double elapsed) {
+  FILE *f = fopen(fname, "w");
+  assert(f != NULL);
+  fprintf(f, "%f", elapsed);
+  fclose(f);
 }
 
 #endif // HISTO_HELPER
