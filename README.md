@@ -1,5 +1,7 @@
 # Artifact for *Compiling Generalized Histograms for GPU*
 
+[![DOI](https://zenodo.org/badge/178193880.svg)](https://zenodo.org/badge/latestdoi/178193880)
+
 The experiments in the paper comprise various GPU programs that
 generally perform their own internal timing. In principle,
 reproduction should be as easy as compiling and running them. Most of
