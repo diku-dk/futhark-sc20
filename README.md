@@ -31,9 +31,17 @@ runtime results, and re-running `make` will not re-run the benchmarks,
 but only re-report the last results.  Use `make -B` (or `make clean`)
 to actually perform a re-run.
 
+## System requirements
+
+* A working and properly setup CUDA installation, such that `gcc` can
+  link with the `cuda` and `nvrtc` libraries without any other
+  options.
+
+* Python 3 with NumPy and Matplotlib.
+
 ## Paper environment
 
 We have run the experiments in the paper on a server-class computer
 with an Intel(R) Xeon(R) CPU E5-2650 v2 CPU, but more importantly an
 NVIDIA RTX 2080 Ti GPU. The operating system was RHEL 7.7 and we used
-CUDA 10.1 for the GPU interaction.  You will need a UTF-8 locale.
+CUDA 10.1 for the GPU interaction.

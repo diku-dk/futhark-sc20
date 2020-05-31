@@ -196,12 +196,12 @@ naive_argmin_reduce_kernel (uint64_t * d_his, uint64_t * d_res, int his_sz, int 
  * M degree of sub-histogramming per block/workgroup
  *   (one workgroup computes M histograms)
  * C is the cooperation level ceil(BLOCK/M)
- * T the number of used hardware threads, i.e., T = min(N, Thwd_max)
+ * T the number of used hardware threads, i.e., T = min(N, Thdw_max)
  * histos: the global-memory array to store the subhistogram result. 
  */
 template<AtomicPrim primKind, class BETA>
 __global__ void
-locMemHwdAddCoopKernel( const int RF, const int N, const int H, const int M
+locMemHdwAddCoopKernel( const int RF, const int N, const int H, const int M
                       , const int chunk_beg, const int chunk_end
                       , const int T, int* input,  BETA* histos) {
     extern __shared__ volatile int32_t loc_mem[];
@@ -267,7 +267,7 @@ locMemHwdAddCoopKernel( const int RF, const int N, const int H, const int M
 /**************************************************/
 template<AtomicPrim primKind, class BETA>
 __global__ void
-glbMemHwdAddCoopKernel( const int RF,
+glbMemHdwAddCoopKernel( const int RF,
                         const int N, const int H,
                         const int M, const int T,
                         const int chunk_beg, const int chunk_end,

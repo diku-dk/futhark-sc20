@@ -77,7 +77,7 @@ void printTextTab(const unsigned long runtimes[3][num_histos][num_m_degs],
     printf("\n\n");
 
     printf(BOLD "%s, RF=%d\n" RESET,
-           k == 0 ? "HWD" :
+           k == 0 ? "HDW" :
            k == 1 ? "CAS" :
            "XCG",
            RF);
@@ -132,7 +132,7 @@ struct AddI32 {
   }
 
   __device__ __host__ inline static
-  genhist::AtomicPrim atomicKind() { return genhist::HWD; }
+  genhist::AtomicPrim atomicKind() { return genhist::HDW; }
 
   __device__ inline static
   void opAtom(volatile BETA* hist, volatile int* locks, int32_t idx, BETA v) {
@@ -393,7 +393,7 @@ void runLocalMemDataset(int32_t* h_input, uint32_t* h_histo, int32_t* d_input, c
   for(int i=0; i<num_histos; i++) {
     const int H = histo_sizes[i];
 
-    { // FOR HWD
+    { // FOR HDW
       goldSeqHisto< AddI32<RF> >(N, H, h_input, (int32_t*)h_histo);
       runtimes[0][i][0] = shmemHistoRunValid< AddI32<RF> >( GPU_RUNS, H, N, d_input, (int32_t*)h_histo);
     }
@@ -424,7 +424,7 @@ void runGlobalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, const in
   for(int i=0; i<num_histos; i++) {
     const int H = histo_sizes[i];
 
-    { // For HWD
+    { // For HDW
       goldSeqHisto< AddI32<RF> >(N, H, h_input, (int32_t*)h_histo);
       runtimes[0][i][0] = glbmemHistoRunValid< AddI32<RF> >( GPU_RUNS, B, RF, H, N, d_input, (int32_t*)h_histo);
     }

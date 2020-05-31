@@ -129,7 +129,7 @@ reduceAcrossMultiHistos(AtomicPrim select, uint32_t H, uint32_t M, uint32_t B, u
 /*** Local-Memory Histograms ***/
 /*******************************/
 unsigned long
-locMemHwdAddCoop(AtomicPrim select, const int RF, const int N, const int H, const int histos_per_block
+locMemHdwAddCoop(AtomicPrim select, const int RF, const int N, const int H, const int histos_per_block
                 , const int num_chunks, int* d_input, uint32_t* h_ref_histo) {
     if(histos_per_block <= 0) {
         printf("Illegal subhistogram degree: %d, H:%d, XCG?=%d, EXITING!\n", histos_per_block, H, (select==XCHG));
@@ -158,13 +158,13 @@ locMemHwdAddCoop(AtomicPrim select, const int RF, const int N, const int H, cons
         const int chunkLB = k*Hchunk;
         const int chunkUB = min(H, (k+1)*Hchunk);
         if(select == ADD) {
-          locMemHwdAddCoopKernel<ADD, uint32_t><<< num_blocks, BLOCK, shmem_size >>>
+          locMemHdwAddCoopKernel<ADD, uint32_t><<< num_blocks, BLOCK, shmem_size >>>
               (RF, N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
         } else if (select == CAS){
-          locMemHwdAddCoopKernel<CAS, uint32_t><<< num_blocks, BLOCK, shmem_size >>>
+          locMemHdwAddCoopKernel<CAS, uint32_t><<< num_blocks, BLOCK, shmem_size >>>
               (RF, N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
         } else { // select == XCHG
-          locMemHwdAddCoopKernel<XCHG,uint64_t><<< num_blocks, BLOCK, 3*shmem_size >>>
+          locMemHdwAddCoopKernel<XCHG,uint64_t><<< num_blocks, BLOCK, 3*shmem_size >>>
               (RF, N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, (uint64_t*)d_histos);
         }
       }
@@ -191,13 +191,13 @@ locMemHwdAddCoop(AtomicPrim select, const int RF, const int N, const int H, cons
         const int chunkUB = min(H, (k+1)*Hchunk);
 
         if(select == ADD) {
-          locMemHwdAddCoopKernel<ADD, uint32_t><<< num_blocks, BLOCK, shmem_size >>>
+          locMemHdwAddCoopKernel<ADD, uint32_t><<< num_blocks, BLOCK, shmem_size >>>
               (RF, N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
         } else if (select == CAS){
-          locMemHwdAddCoopKernel<CAS, uint32_t><<< num_blocks, BLOCK, shmem_size >>>
+          locMemHdwAddCoopKernel<CAS, uint32_t><<< num_blocks, BLOCK, shmem_size >>>
               (RF, N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, d_histos);
         } else { // select == XCHG
-          locMemHwdAddCoopKernel<XCHG,uint64_t><<< num_blocks, BLOCK, 3*shmem_size >>>
+          locMemHdwAddCoopKernel<XCHG,uint64_t><<< num_blocks, BLOCK, 3*shmem_size >>>
               (RF, N, H, histos_per_block, chunkLB, chunkUB, NUM_THREADS(N), d_input, (uint64_t*)d_histos);
         }
       }
@@ -227,7 +227,7 @@ locMemHwdAddCoop(AtomicPrim select, const int RF, const int N, const int H, cons
 
         if(!is_valid) {
             int coop = (BLOCK + histos_per_block - 1) / histos_per_block;
-            printf( "locMemHwdAddCoop: Validation FAILS! M:%d, coop:%d, H:%d, ADD:%d, Exiting!\n\n"
+            printf( "locMemHdwAddCoop: Validation FAILS! M:%d, coop:%d, H:%d, ADD:%d, Exiting!\n\n"
                   , histos_per_block, coop, H, (int)select );
             exit(1);
         }
@@ -240,7 +240,7 @@ locMemHwdAddCoop(AtomicPrim select, const int RF, const int N, const int H, cons
 /*** Global-Memory Histograms ***/
 /********************************/
 unsigned long
-glbMemHwdAddCoop(AtomicPrim select, const int RF, const int N, const int H, const int B, const int M, const int num_chunks, int* d_input, uint32_t* h_ref_histo) {
+glbMemHdwAddCoop(AtomicPrim select, const int RF, const int N, const int H, const int B, const int M, const int num_chunks, int* d_input, uint32_t* h_ref_histo) {
     const int T = NUM_THREADS(N);
     const int C = (T + M - 1) / M;
     const int chunk_size = (H + num_chunks - 1) / num_chunks;
@@ -277,13 +277,13 @@ glbMemHwdAddCoop(AtomicPrim select, const int RF, const int N, const int H, cons
     { // dry run
       for(int k=0; k<num_chunks; k++) {
         if(select == ADD) {
-          glbMemHwdAddCoopKernel<ADD, uint32_t><<< num_blocks, B >>>
+          glbMemHdwAddCoopKernel<ADD, uint32_t><<< num_blocks, B >>>
               (RF, N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
         } else if (select == CAS){
-          glbMemHwdAddCoopKernel<CAS, uint32_t><<< num_blocks, B >>>
+          glbMemHdwAddCoopKernel<CAS, uint32_t><<< num_blocks, B >>>
               (RF, N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
         } else { // select == XCHG
-          glbMemHwdAddCoopKernel<XCHG,uint64_t><<< num_blocks, B >>>
+          glbMemHdwAddCoopKernel<XCHG,uint64_t><<< num_blocks, B >>>
               (RF, N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, (uint64_t*)d_histos, d_locks);
         }
       }
@@ -304,13 +304,13 @@ glbMemHwdAddCoop(AtomicPrim select, const int RF, const int N, const int H, cons
 
       for(int k=0; k<num_chunks; k++) {
         if(select == ADD) {
-          glbMemHwdAddCoopKernel<ADD, uint32_t><<< num_blocks, B >>>
+          glbMemHdwAddCoopKernel<ADD, uint32_t><<< num_blocks, B >>>
               (RF, N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
         } else if (select == CAS){
-          glbMemHwdAddCoopKernel<CAS, uint32_t><<< num_blocks, B >>>
+          glbMemHdwAddCoopKernel<CAS, uint32_t><<< num_blocks, B >>>
               (RF, N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, NULL);
         } else { // select == XCHG
-          glbMemHwdAddCoopKernel<XCHG,uint64_t><<< num_blocks, B >>>
+          glbMemHdwAddCoopKernel<XCHG,uint64_t><<< num_blocks, B >>>
               (RF, N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, (uint64_t*)d_histos, d_locks);
         }
       }
@@ -343,7 +343,7 @@ glbMemHwdAddCoop(AtomicPrim select, const int RF, const int N, const int H, cons
         cudaFree(d_locks);
 
         if(!is_valid) {
-            printf( "glbMemHwdAddCoop: Validation FAILS! B:%d, T:%d, N:%d, H:%d, M:%d, coop:%d, XCHG:%d, Exiting!\n\n"
+            printf( "glbMemHdwAddCoop: Validation FAILS! B:%d, T:%d, N:%d, H:%d, M:%d, coop:%d, XCHG:%d, Exiting!\n\n"
                   , B, T, N, H, M, C, (int)(select==XCHG) );
             exit(1);
         }

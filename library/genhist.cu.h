@@ -21,7 +21,7 @@
 
 namespace genhist {
 
-enum AtomicPrim {HWD, CAS, XCG};
+enum AtomicPrim {HDW, CAS, XCG};
 
 template<class T>
 struct indval {
@@ -96,11 +96,11 @@ glbhist_reduce_kernel(typename T::BETA* d_his, typename T::BETA* d_res, int32_t 
 // M degree of sub-histogramming per block/workgroup
 //   (one workgroup computes M histograms)
 // C is the cooperation level ceil(BLOCK/M)
-// T the number of used hardware threads, i.e., T = min(N, Thwd_max)
+// T the number of used hardware threads, i.e., T = min(N, Thdw_max)
 // histos: the global-memory array to store the subhistogram result.
 template<class HP>
 __global__ void
-locMemHwdAddCoopKernel( const int N, const int H
+locMemHdwAddCoopKernel( const int N, const int H
                         , const int M, const int T
                         , const int chunk_beg, const int chunk_end
                         , typename HP::ALPHA* input
@@ -159,7 +159,7 @@ locMemHwdAddCoopKernel( const int N, const int H
 // Global-Memory Histogram Computation Kernel
 template<class HP>
 __global__ void
-glbMemHwdAddCoopKernel( const int N, const int H,
+glbMemHdwAddCoopKernel( const int N, const int H,
                         const int M, const int T,
                         const int chunk_beg, const int chunk_end,
                         typename HP::ALPHA* input,
@@ -220,10 +220,10 @@ public:
 protected:
 
   inline int numThreads(int n) const {
-    return std::min(n, getHWD());
+    return std::min(n, getHDW());
   }
 
-  inline int32_t getHWD() const {
+  inline int32_t getHDW() const {
     return gpu_props.maxThreadsPerMultiProcessor * gpu_props.multiProcessorCount;
   }
 
@@ -292,7 +292,7 @@ public:
       const int32_t chunkLB = k*Hchunk;
       const int32_t chunkUB = min(H, (k+1)*Hchunk);
 
-      locMemHwdAddCoopKernel<HP><<< num_blocks, BLOCK, shmem_size >>>
+      locMemHdwAddCoopKernel<HP><<< num_blocks, BLOCK, shmem_size >>>
         (N, H, M, GenHist<HP>::numThreads(N), chunkLB, chunkUB, d_input, d_histos);
     }
 
@@ -340,7 +340,7 @@ public:
     const int H_chk = (int)ceil( H / num_chunks );
 
     // second part
-    const float u = (prim_kind == HWD) ? 2.0 : 1.0;
+    const float u = (prim_kind == HDW) ? 2.0 : 1.0;
     const float k_max= std::min( consts.L2Fract * ( (1.0F*consts.L2Cache) / el_size ) * race_exp, (float)N ) / T;
     const float coop = std::min( (float)T, (u * H_chk) / k_max );
     M = max( 1, (int)floor(T/coop) );
@@ -380,7 +380,7 @@ public:
 
     // compute histogram
     for(int k=0; k<num_chunks; k++) {
-      glbMemHwdAddCoopKernel<HP><<< num_blocks, B >>>
+      glbMemHdwAddCoopKernel<HP><<< num_blocks, B >>>
         (N, H, M, T, k*chunk_size, (k+1)*chunk_size, d_input, d_histos, d_locks);
     }
     // reduce across subhistograms

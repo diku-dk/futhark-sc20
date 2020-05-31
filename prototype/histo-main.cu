@@ -53,11 +53,11 @@
 #define LOCMEMW_PERTHD 12
 #endif
 
-unsigned int HWD;
+unsigned int HDW;
 unsigned int SH_MEM_SZ;
 unsigned int BLOCK_SZ;
 
-#define NUM_THREADS(n)  min(n, HWD)
+#define NUM_THREADS(n)  min(n, HDW)
 
 #include "histo-kernels.cu.h"
 #include "histo-wrap.cu.h"
@@ -94,7 +94,7 @@ void printTextTab( const unsigned long runtimes[3][num_histos][num_m_degs]
         printf("\n\n");
 
         printf(BOLD "%s, RF=%d\n" RESET,
-               k == 0 ? "HWD" :
+               k == 0 ? "HDW" :
                k == 1 ? "CAS" :
                "XCG",
                RF);
@@ -218,7 +218,7 @@ void autoGlbChunksSubhists(
 
 
 void runLocalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, int RF, int N,
-                        const char *hwd_csv, const char *cas_csv, const char *xcg_csv) {
+                        const char *hdw_csv, const char *cas_csv, const char *xcg_csv) {
     const int num_histos = 8;
     const int num_m_degs = 6;
     const int histo_sizes[num_histos] = {31, 127, 505, 2041, 6141, 12281, 24569, 49145};
@@ -246,11 +246,11 @@ void runLocalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, int RF, i
               if(j == num_m_degs-1) {
                 int histos_per_block, num_chunks;
                 autoLocSubHistoDeg(ADD, RF, H, N, &histos_per_block, &num_chunks);
-                runtimes[0][i][j] = locMemHwdAddCoop(ADD, RF, N, H, histos_per_block, num_chunks, d_input, h_histo);
+                runtimes[0][i][j] = locMemHdwAddCoop(ADD, RF, N, H, histos_per_block, num_chunks, d_input, h_histo);
               } else {
                 const int lmem = LOCMEMW_PERTHD*BLOCK, M = subhisto_degs[j];
                 int len = lmem / M, num_chunks = (H + len - 1) / len;
-                runtimes[0][i][j] = locMemHwdAddCoop(ADD, RF, N, H, M, num_chunks, d_input, h_histo);
+                runtimes[0][i][j] = locMemHdwAddCoop(ADD, RF, N, H, M, num_chunks, d_input, h_histo);
               }
             }
         }
@@ -261,11 +261,11 @@ void runLocalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, int RF, i
               if(j == num_m_degs-1) {
                 int histos_per_block, num_chunks;
                 autoLocSubHistoDeg(CAS, RF, H, N, &histos_per_block, &num_chunks);
-                runtimes[1][i][j] = locMemHwdAddCoop(CAS, RF, N, H, histos_per_block, num_chunks, d_input, h_histo);
+                runtimes[1][i][j] = locMemHdwAddCoop(CAS, RF, N, H, histos_per_block, num_chunks, d_input, h_histo);
               } else {
                 const int lmem = LOCMEMW_PERTHD*BLOCK, M = subhisto_degs[j];
                 int len = lmem / M, num_chunks = (H + len - 1) / len;
-                runtimes[1][i][j] = locMemHwdAddCoop(CAS, RF, N, H, M, num_chunks, d_input, h_histo);
+                runtimes[1][i][j] = locMemHdwAddCoop(CAS, RF, N, H, M, num_chunks, d_input, h_histo);
               }
             }
         }
@@ -277,11 +277,11 @@ void runLocalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, int RF, i
               if(j == num_m_degs-1) {
                 int histos_per_block, num_chunks;
                 autoLocSubHistoDeg(XCHG, RF, H, N, &histos_per_block, &num_chunks);
-                runtimes[2][i][j] = locMemHwdAddCoop(XCHG, RF, N, H, histos_per_block, num_chunks, d_input, h_histo); 
+                runtimes[2][i][j] = locMemHdwAddCoop(XCHG, RF, N, H, histos_per_block, num_chunks, d_input, h_histo); 
               } else {
                 const int lmem = LOCMEMW_PERTHD*BLOCK, M = subhisto_degs[j];
                 int len = lmem / (3*M), num_chunks = (H + len - 1) / len;
-                runtimes[2][i][j] = locMemHwdAddCoop(XCHG, RF, N, H, M, num_chunks, d_input, h_histo);
+                runtimes[2][i][j] = locMemHdwAddCoop(XCHG, RF, N, H, M, num_chunks, d_input, h_histo);
               }
             }
         }
@@ -290,8 +290,8 @@ void runLocalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, int RF, i
 
     printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, ks, RF);
 
-    if (hwd_csv) {
-        printCSV(hwd_csv, 0, runtimes, histo_sizes, ks, "_");
+    if (hdw_csv) {
+        printCSV(hdw_csv, 0, runtimes, histo_sizes, ks, "_");
     }
     if (cas_csv) {
         printCSV(cas_csv, 1, runtimes, histo_sizes, ks, "_");
@@ -302,17 +302,13 @@ void runLocalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, int RF, i
 }
 
 void runGlobalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, const int RF, const int N,
-                        const char *hwd_csv, const char *cas_csv, const char *xcg_csv) {
+                        const char *hdw_csv, const char *cas_csv, const char *xcg_csv) {
     const int B = 256;
     const int T = NUM_THREADS(N);
     const int num_histos = 7;
     const int num_m_degs = 6;
-    const int algn = 1;
     const int histo_sizes[num_histos] = { 12281,  24569,  49145
                                         , 196607, 393215, 786431, 1572863 };
-                                        //{ 1*12*1024-algn,  2*12*1024-algn,  4*12*1024-algn
-                                        //, 8*12*1024-algn, 16*12*1024-algn, 32*12*1024-algn
-                                        //, 64*12*1024-algn, 128*12*1024-algn };
     const int subhisto_degs[num_m_degs] = { 1, 4, 8, 16, 32, 33 };    
     unsigned long runtimes[3][num_histos][num_m_degs];
 
@@ -332,7 +328,7 @@ void runGlobalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, const in
                 if(j==(num_m_degs-1))
                     printf("Our M_add: %d, num_chunks_add: %d, for H: %d\n", M_add, num_chunks_add, H);
 
-                runtimes[0][i][j] = glbMemHwdAddCoop(ADD, RF, N, H, B, M_add, num_chunks_add, d_input, h_histo);
+                runtimes[0][i][j] = glbMemHdwAddCoop(ADD, RF, N, H, B, M_add, num_chunks_add, d_input, h_histo);
             }
         }
 
@@ -349,7 +345,7 @@ void runGlobalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, const in
                 if(j==(num_m_degs-1))
                     printf("Our M_cas: %d, num_chunks_cas: %d, for H: %d\n", M_cas, num_chunks_cas, H);
 
-                runtimes[1][i][j] = glbMemHwdAddCoop(CAS, RF, N, H, B, M_cas, num_chunks_cas, d_input, h_histo);
+                runtimes[1][i][j] = glbMemHdwAddCoop(CAS, RF, N, H, B, M_cas, num_chunks_cas, d_input, h_histo);
             }
         }
 
@@ -366,7 +362,7 @@ void runGlobalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, const in
                 if(j==(num_m_degs-1))
                     printf("Our M_lck: %d, num_chunks_lck: %d, for H: %d\n", M_lck, num_chunks_lck, H);
 
-                runtimes[2][i][j] = glbMemHwdAddCoop(XCHG, RF, N, H, B, M_lck, num_chunks_lck, d_input, h_histo);
+                runtimes[2][i][j] = glbMemHdwAddCoop(XCHG, RF, N, H, B, M_lck, num_chunks_lck, d_input, h_histo);
             }
         }
     }
@@ -376,8 +372,8 @@ void runGlobalMemDataset(int* h_input, uint32_t* h_histo, int* d_input, const in
 
     printTextTab<num_histos,num_m_degs>(runtimes, histo_sizes, subhisto_degs, RF);
 
-    if (hwd_csv) {
-        printCSV(hwd_csv, 0, runtimes, histo_sizes, subhisto_degs, "=");
+    if (hdw_csv) {
+        printCSV(hdw_csv, 0, runtimes, histo_sizes, subhisto_degs, "=");
     }
     if (cas_csv) {
         printCSV(cas_csv, 1, runtimes, histo_sizes, subhisto_degs, "=");
@@ -410,12 +406,12 @@ int main(int argc, char **argv) {
     }
 
     int RF = atoi(argv[2]);
-    const char *hwd_csv = NULL;
+    const char *hdw_csv = NULL;
     const char *cas_csv = NULL;
     const char *xcg_csv = NULL;
 
     if (argc == 6) {
-        hwd_csv = argv[3];
+        hdw_csv = argv[3];
         cas_csv = argv[4];
         xcg_csv = argv[5];
     }
@@ -430,12 +426,12 @@ int main(int argc, char **argv) {
         cudaDeviceProp prop;
 
         cudaGetDeviceProperties(&prop, 0);
-        HWD = prop.maxThreadsPerMultiProcessor * prop.multiProcessorCount;
+        HDW = prop.maxThreadsPerMultiProcessor * prop.multiProcessorCount;
         BLOCK_SZ = prop.maxThreadsPerBlock;
         SH_MEM_SZ = prop.sharedMemPerBlock;
         if (DEBUG_INFO) {
             printf("Device name: %s\n", prop.name);
-            printf("Number of hardware threads: %d\n", HWD);
+            printf("Number of hardware threads: %d\n", HDW);
             printf("Block size: %d\n", BLOCK_SZ);
             printf("Shared memory size: %d\n", SH_MEM_SZ);
             puts("====");
@@ -477,10 +473,10 @@ int main(int argc, char **argv) {
  
     if (run_local) {
         runLocalMemDataset(h_input, h_histo, d_input, RF, INP_LEN,
-                           hwd_csv, cas_csv, xcg_csv);
+                           hdw_csv, cas_csv, xcg_csv);
     } else {
         runGlobalMemDataset(h_input, h_histo, d_input, RF, INP_LEN,
-                            hwd_csv, cas_csv, xcg_csv);
+                            hdw_csv, cas_csv, xcg_csv);
     }
 
     // 7. clean up memory
