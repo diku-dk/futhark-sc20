@@ -13,9 +13,6 @@ let find_nearest_point [k][d] (pts: [k][d]f32) (pt: [d]f32): i32 =
                (zip (iota k) (map (euclid_dist_2 pt) pts))
   in i
 
-let add_centroids [d] (x: [d]f32) (y: [d]f32): *[d]f32 =
-  map2 (+) x y
-
 let centroids_of [n][d] (k: i32) (points: [n][d]f32) (membership: [n]i32): [k][d]f32 =
   let points_in_clusters =
     reduce_by_index (replicate k 0) (+) 0 membership (replicate n 1)
