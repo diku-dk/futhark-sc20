@@ -6,11 +6,6 @@ to make the Futhark parts easily runnable, most third party reference
 implementations are large, complex, and fragile, and unfortunately not
 packaged.
 
-* [prototype](prototype/) contains a Futhark implementation of the
-  histograms computed by [the prototype](../prototype/).  It does not
-  correspond to any part of the paper and is provided only in case of
-  interest.
-
 * [cub](cub/) contains Futhark and CUB implementations of histogram
   computations, corresponding to section IV.B of the paper.
 
