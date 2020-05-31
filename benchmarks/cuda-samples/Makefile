@@ -6,7 +6,7 @@ FUTHARK_BENCH_RUNS=1000
 
 .PHONY: run
 
-run: ./histogram64.seconds histogram256.seconds cuda-samples.json
+run: histogram64.seconds histogram256.seconds cuda-samples.json
 	python3 report.py
 
 cuda-samples-orig: cuda-samples-orig.cu

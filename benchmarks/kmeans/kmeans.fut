@@ -28,9 +28,9 @@ let centroids_of [n][d] (k: i32) (points: [n][d]f32) (membership: [n]i32): [k][d
   in map2 (\point n -> map (/r32 (if n == 0 then 1 else n)) point)
           cluster_sums points_in_clusters
 
-let main [n][d]
-        (threshold: i32) (k: i32) (max_iterations: i32)
-        (points: [n][d]f32) =
+let main [n][d] (k: i32) (points: [n][d]f32) =
+  let threshold = t32 (r32 n * 0.01) -- 1%
+  let max_iterations = 1000 -- Not reached.
   -- Assign arbitrary initial cluster centres.
   let cluster_centres = take k points
   -- Also assign points arbitrarily to clusters.
