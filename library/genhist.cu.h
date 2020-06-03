@@ -4,6 +4,12 @@
 // See example.cu for an example of how to use it.  A short
 // description follows.
 //
+// The GenHistConfig class defines various configurable parameters for
+// how the hardware should be exploited.  The 'rtx2080' variable
+// contains parameters that we found worked well on an RTX2080 Ti GPU
+// (and which we expect will also work well on most other recent
+// GPUs).
+//
 // The main entry point is the two classes LocalMemoryGenHist and
 // GlobalMemoryGenHist, which encapsulate the state (mostly memory
 // allocations) for computing generalized histograms for a certain
@@ -11,6 +17,9 @@
 // which must be given at creation time).  The two classes then define
 // a method 'exec' for actually computing a generalized histogram, and
 // 'result' for obtaining the memory in which the histogram is stored.
+//
+// These classes are templates, which are parameterised with the
+// histogram operator to perform.
 
 #pragma once
 
@@ -86,6 +95,27 @@ glbhist_reduce_kernel(typename T::BETA* d_his, typename T::BETA* d_res, int32_t 
       sum = T::opScal(sum, d_his[i]);
     d_res[gid] = sum;
   }
+}
+
+template<typename ALPHA, typename BETA>
+struct HistDescriptor {
+  typedef int32_t  BETA;
+  typedef int32_t  ALPHA;
+
+  __device__ __host__ inline static
+  genhist::indval<BETA> f(const int32_t H, ALPHA pixel);
+
+  __device__ __host__ inline static
+  BETA ne();
+
+  __device__ __host__ inline static
+  BETA opScal(BETA v1, BETA v2);
+
+  __device__ __host__ inline static
+  genhist::AtomicPrim atomicKind();
+
+  __device__ inline static
+  void opAtom(volatile BETA* hist, volatile int* locks, int32_t idx, BETA v);
 }
 
 // Local-Memory Histogram Computation Kernel
