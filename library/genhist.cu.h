@@ -19,7 +19,8 @@
 // 'result' for obtaining the memory in which the histogram is stored.
 //
 // These classes are templates, which are parameterised with the
-// histogram operator to perform.
+// histogram descriptor to perform.  This descriptor must inherit from
+// HistDescriptor (or at least implement the same interface).
 
 #pragma once
 
@@ -97,26 +98,34 @@ glbhist_reduce_kernel(typename T::BETA* d_his, typename T::BETA* d_res, int32_t 
   }
 }
 
-template<typename ALPHA, typename BETA>
+template<typename A, typename B>
 struct HistDescriptor {
-  typedef int32_t  BETA;
-  typedef int32_t  ALPHA;
+  // Input array element type.
+  typedef A ALPHA;
 
+  // Histogram element type.
+  typedef B BETA;
+
+  // Compute an (index,value) pair given an input element.
   __device__ __host__ inline static
   genhist::indval<BETA> f(const int32_t H, ALPHA pixel);
 
+  // Neutral element.
   __device__ __host__ inline static
   BETA ne();
 
+  // Apply binary operator.
   __device__ __host__ inline static
   BETA opScal(BETA v1, BETA v2);
 
+  // What kind of atomic strategy do we need?
   __device__ __host__ inline static
   genhist::AtomicPrim atomicKind();
 
+  // Apply binary operator atomically on memory location.
   __device__ inline static
   void opAtom(volatile BETA* hist, volatile int* locks, int32_t idx, BETA v);
-}
+};
 
 // Local-Memory Histogram Computation Kernel
 //
