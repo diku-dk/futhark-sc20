@@ -121,5 +121,3 @@ entry main  [nri] [nrip1] [nrj] [num_particles] [histo_len]
 
   let faction' = map (\i-> faction_iinr'[i] + faction_jjnr'[i]) (iota histo_len)
   in  faction'
-
---futhark bench --backend=opencl --pass-option=--default-num-groups=144 --pass-option=--default-group-size=256 -r 1000 inl1100.fut
