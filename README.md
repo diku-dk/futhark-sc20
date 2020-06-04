@@ -36,8 +36,8 @@ to actually perform a re-run.
 ## System requirements
 
 * A working and properly setup CUDA installation, such that `gcc` can
-  link with the `cuda` and `nvrtc` libraries without any other
-  options.
+  link with the `cuda`, `nvrtc`, and `OpenCL` libraries without any
+  other options.
 
 * Python 3 with NumPy and Matplotlib.
 

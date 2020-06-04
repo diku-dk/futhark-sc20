@@ -10,9 +10,11 @@ endif
 
 FUTHARK_BACKEND=cuda
 
+FUTHARK_NUM_GROUPS=272
+
 # Note that these options are specific to the 'cuda' backend, so you
 # may want to comment them out when using 'opencl'.
-FUTHARK_BENCH_OPTIONS=--pass-option=--nvrtc-option=-arch=compute_35 --pass-option=--default-num-groups=272
+FUTHARK_BENCH_OPTIONS=--pass-option=--nvrtc-option=-arch=compute_35 --pass-option=--default-num-groups=$(FUTHARK_NUM_GROUPS)
 
 # Some benchmarks override this if they run very quickly and need more
 # iterations for stable results.
