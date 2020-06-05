@@ -61,3 +61,9 @@ We have run the experiments in the paper on a server-class computer
 with an Intel(R) Xeon(R) CPU E5-2650 v2 CPU, but more importantly an
 NVIDIA RTX 2080 Ti GPU. The operating system was RHEL 7.7 and we used
 CUDA 10.1 for the GPU interaction.
+
+Note that some constants (such as the amount of available L2 cache)
+are tuned for the RTX 2080 Ti GPU, and have not yet been made
+configurable or self-configuring.  Anecdotal evidence suggests that
+the current configuration is still good on most contemporary NVIDIA
+hardware.
