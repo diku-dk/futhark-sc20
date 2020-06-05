@@ -33,6 +33,7 @@ data/k5.in: benchmark_data
 	futhark dataset -b -g 5 -g '[100000][256]f32' > $@
 
 kmeans.json: kmeans.fut data
+	$(FUTHARK) bench --backend=opencl $(FUTHARK_OPENCL_BENCH_OPTIONS) -r $(FUTHARK_BENCH_RUNS) $< --json $@
 
 kmeans-kmcuda: kmeans-kmcuda.c $(KMCUDA)/src/libKMCUDA.so
 	gcc $< -o $@ -O3 -std=c99 -I$(KMCUDA)/src $(KMCUDA)/src/libKMCUDA.so
