@@ -278,8 +278,8 @@ test_eval,_=LinearSpline3D(pts,x,device,True)
 
 print('diff',time()-st)
 
-#x=torch.rand([2000000,2], dtype=torch.float32,device=device)*50-30
-x=torch.rand([8000000,2], dtype=torch.float32,device=device)*50-30
+x=torch.rand([2000000,2], dtype=torch.float32,device=device)*50-30
+#x=torch.rand([8000000,2], dtype=torch.float32,device=device)*50-30
 
 x.requires_grad_()
 
@@ -289,7 +289,6 @@ print('Pytorch GPU Histogram Runtime:',time()-st)
 print('Hist_a: ', hist_a[:32])
 print('Hist_b: ', hist_b[:32])
 print('Hist_c: ', hist_c[:32])
-
 
 st = time()
 
