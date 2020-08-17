@@ -4,7 +4,13 @@ FUTHARK_BENCH_RUNS=10
 
 KMCUDA=kmcuda-6.2.3
 
+# Some old systems in wide use (RHEL...) require 'cmake3' to access
+# cmake version 3.  Let's hack this.
+ifeq ($(shell which cmake3),)
 CMAKE=cmake
+else
+CMAKE=cmake3
+endif
 
 KMCUDA_CUDA_ARCH=75
 
@@ -27,6 +33,7 @@ data/k5.in: benchmark_data
 	futhark dataset -b -g 5 -g '[100000][256]f32' > $@
 
 kmeans.json: kmeans.fut data
+	$(FUTHARK) bench --backend=opencl $(FUTHARK_OPENCL_BENCH_OPTIONS) -r $(FUTHARK_BENCH_RUNS) $< --json $@
 
 kmeans-kmcuda: kmeans-kmcuda.c $(KMCUDA)/src/libKMCUDA.so
 	gcc $< -o $@ -O3 -std=c99 -I$(KMCUDA)/src $(KMCUDA)/src/libKMCUDA.so

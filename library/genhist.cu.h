@@ -4,6 +4,12 @@
 // See example.cu for an example of how to use it.  A short
 // description follows.
 //
+// The GenHistConfig class defines various configurable parameters for
+// how the hardware should be exploited.  The 'rtx2080' variable
+// contains parameters that we found worked well on an RTX2080 Ti GPU
+// (and which we expect will also work well on most other recent
+// GPUs).
+//
 // The main entry point is the two classes LocalMemoryGenHist and
 // GlobalMemoryGenHist, which encapsulate the state (mostly memory
 // allocations) for computing generalized histograms for a certain
@@ -11,6 +17,10 @@
 // which must be given at creation time).  The two classes then define
 // a method 'exec' for actually computing a generalized histogram, and
 // 'result' for obtaining the memory in which the histogram is stored.
+//
+// These classes are templates, which are parameterised with the
+// histogram descriptor to perform.  This descriptor must inherit from
+// HistDescriptor (or at least implement the same interface).
 
 #pragma once
 
@@ -87,6 +97,35 @@ glbhist_reduce_kernel(typename T::BETA* d_his, typename T::BETA* d_res, int32_t 
     d_res[gid] = sum;
   }
 }
+
+template<typename A, typename B>
+struct HistDescriptor {
+  // Input array element type.
+  typedef A ALPHA;
+
+  // Histogram element type.
+  typedef B BETA;
+
+  // Compute an (index,value) pair given an input element.
+  __device__ __host__ inline static
+  genhist::indval<BETA> f(const int32_t H, ALPHA pixel);
+
+  // Neutral element.
+  __device__ __host__ inline static
+  BETA ne();
+
+  // Apply binary operator.
+  __device__ __host__ inline static
+  BETA opScal(BETA v1, BETA v2);
+
+  // What kind of atomic strategy do we need?
+  __device__ __host__ inline static
+  genhist::AtomicPrim atomicKind();
+
+  // Apply binary operator atomically on memory location.
+  __device__ inline static
+  void opAtom(volatile BETA* hist, volatile int* locks, int32_t idx, BETA v);
+};
 
 // Local-Memory Histogram Computation Kernel
 //

@@ -36,12 +36,19 @@ to actually perform a re-run.
 ## System requirements
 
 * A working and properly setup CUDA installation, such that `gcc` can
-  link with the `cuda` and `nvrtc` libraries without any other
-  options.
+  link with the `cuda`, `nvrtc`, and `OpenCL` libraries without any
+  other options.
 
 * Python 3 with NumPy and Matplotlib.
 
+* Enough LaTeX for Matplotlib's LaTeX backend to work.  On most Linux
+  distributions, the "`texlive-full`" package will suffice.
+
 * `make` must refer to GNU Make.
+
+* CMake version 3 must be available as either `cmake3` or `cmake` (the
+  tooling will prefer the former, which is what it's called on RHEL
+  7).
 
 * An approriate version of `futhark` (0.15.6 or later) must be on the
   shell `PATH`.  Run `make bin/futhark` in this directory to unpack a
@@ -54,3 +61,9 @@ We have run the experiments in the paper on a server-class computer
 with an Intel(R) Xeon(R) CPU E5-2650 v2 CPU, but more importantly an
 NVIDIA RTX 2080 Ti GPU. The operating system was RHEL 7.7 and we used
 CUDA 10.1 for the GPU interaction.
+
+Note that some constants (such as the amount of available L2 cache)
+are tuned for the RTX 2080 Ti GPU, and have not yet been made
+configurable or self-configuring.  Anecdotal evidence suggests that
+the current configuration is still good on most contemporary NVIDIA
+hardware.

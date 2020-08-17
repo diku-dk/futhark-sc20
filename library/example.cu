@@ -109,10 +109,7 @@ void printTextTab(const unsigned long runtimes[3][num_histos][num_m_degs],
 // Histogram descriptors
 
 template<int RF>
-struct AddI32 {
-  typedef int32_t  BETA;
-  typedef int32_t  ALPHA;
-
+struct AddI32 : genhist::HistDescriptor<int32_t, int32_t> {
   __device__ __host__ inline static
   genhist::indval<BETA> f(const int32_t H, ALPHA pixel) {
     genhist::indval<BETA> res;
@@ -141,10 +138,7 @@ struct AddI32 {
 };
 
 template<int RF>
-struct SatAdd24 {
-  typedef uint32_t BETA;
-  typedef int32_t  ALPHA;
-
+struct SatAdd24 : genhist::HistDescriptor<int32_t, uint32_t> {
   __device__ __host__ inline static
   genhist::indval<BETA> f(const int32_t H, ALPHA pixel) {
     genhist::indval<BETA> res;
@@ -181,10 +175,7 @@ struct SatAdd24 {
 };
 
 template<int RF>
-struct ArgMaxI64 {
-  typedef uint64_t  BETA;
-  typedef int32_t   ALPHA;
-
+struct ArgMaxI64 : genhist::HistDescriptor<int32_t, uint64_t> {
   __device__ __host__ inline static
   BETA pack64(uint32_t ind, uint32_t val) {
     uint64_t res = ind;

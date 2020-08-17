@@ -56,7 +56,7 @@ entry main  [nri] [nrip1] [nrj] [num_particles] [histo_len]
             (jindex: [nrip1]i32) (iinr: [nri]i32) (jjnr: [nrj]i32)
             (shift: [nri]i32) (types: [num_particles]i32)
             (ntype: i32) (facel: real)
-            (shiftvec: []real) (pos: [histo_len]real) (faction1d: [histo_len]real)
+            (shiftvec: []real) (pos: [histo_len]real) (faction1d: *[histo_len]real)
             (charge: [num_particles]real) (nbfp: []real)
         = --: *[]real =
   #[unsafe]
@@ -112,7 +112,7 @@ entry main  [nri] [nrip1] [nrj] [num_particles] [histo_len]
       in  ([tx11, ty11, tz11], jnr, iinr[oind])
 
   let faction_iinr = replicate histo_len nul |> unflatten num_particles 3
-  let faction_jjnr = copy faction1d |> unflatten num_particles 3
+  let faction_jjnr = faction1d |> unflatten num_particles 3
   let (txyz11s2Ds_iinr, ext_jnrs, ext_inrs) = unzip3 <| map2 inner_body out_inds (iota len_flat)
   let txyz11s2Ds_jjnr = map (\row -> map (\x -> nul-x) row) txyz11s2Ds_iinr
 
@@ -121,5 +121,3 @@ entry main  [nri] [nrip1] [nrj] [num_particles] [histo_len]
 
   let faction' = map (\i-> faction_iinr'[i] + faction_jjnr'[i]) (iota histo_len)
   in  faction'
-
---futhark bench --backend=opencl --pass-option=--default-num-groups=144 --pass-option=--default-group-size=256 -r 1000 inl1100.fut

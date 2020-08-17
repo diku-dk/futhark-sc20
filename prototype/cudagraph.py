@@ -63,27 +63,27 @@ def ax_props(ax, title, ylabel=False, xlabel=True):
 
 plot_lib(axes[0,0], hdw_shared_1_file, 'shared', ':')
 plot_lib(axes[0,0], hdw_global_1_file, 'global', '--')
-ax_props(axes[0,0], 'HDW, RF=1', ylabel=True, xlabel=False)
+ax_props(axes[0,0], 'HDW, race factor=1', ylabel=True, xlabel=False)
 
 plot_lib(axes[0,1], cas_shared_1_file, 'shared', ':')
 plot_lib(axes[0,1], cas_global_1_file, 'global', '--')
-ax_props(axes[0,1], 'CAS, RF=1', ylabel=False, xlabel=False)
+ax_props(axes[0,1], 'CAS, race factor=1', ylabel=False, xlabel=False)
 
 plot_lib(axes[0,2], xcg_shared_1_file, 'shared', ':')
 plot_lib(axes[0,2], xcg_global_1_file, 'global', '--')
-ax_props(axes[0,2], 'XCG, RF=1', ylabel=False, xlabel=False)
+ax_props(axes[0,2], 'XCG, race factor=1', ylabel=False, xlabel=False)
 
 plot_lib(axes[1,0], hdw_shared_63_file, 'shared', ':')
 plot_lib(axes[1,0], hdw_global_63_file, 'global', '--')
-ax_props(axes[1,0], 'HDW, RF=63', ylabel=True, xlabel=True)
+ax_props(axes[1,0], 'HDW, race factor=63', ylabel=True, xlabel=True)
 
 plot_lib(axes[1,1], cas_shared_63_file, 'shared', ':')
 plot_lib(axes[1,1], cas_global_63_file, 'global', '--')
-ax_props(axes[1,1], 'CAS, RF=63', ylabel=False, xlabel=True)
+ax_props(axes[1,1], 'CAS, race factor=63', ylabel=False, xlabel=True)
 
 plot_lib(axes[1,2], xcg_shared_63_file, 'shared', ':')
 plot_lib(axes[1,2], xcg_global_63_file, 'global', '--')
-ax_props(axes[1,2], 'XCG, RF=63', ylabel=False, xlabel=True)
+ax_props(axes[1,2], 'XCG, race factor=63', ylabel=False, xlabel=True)
 
 
 axes[0,0].legend(loc='upper center', framealpha=1, ncol=6, fancybox=False,
