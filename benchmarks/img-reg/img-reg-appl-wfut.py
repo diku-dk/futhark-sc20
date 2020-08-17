@@ -1,5 +1,7 @@
 import torch
 
+import wrapFuthark
+
 from time import time
 
 def CubicBSpline3D(pts,x,device='cpu',return_jac=False):
@@ -133,91 +135,41 @@ def LinearSpline3D(pts,x,device='cpu',return_jac=False):
 
 # vals is a vector of pairs of values, i.e., (zip vdataR vval) in C code.
 def Histogram2D(vals,device):
-    print('In Histo2D, shape input: ', vals.shape)
-    print('In Histo2D, vals: ',vals[:32])
+    #print('In Histo2D, shape input: ', vals.shape, vals.size(0))
+    #rangeh=torch.ceil(vals.max()-vals.min()).int()+6
+    #print('Range, vals: ',rangeh)
 
 
-    #preconpute the range
+    dataR=(vals[:,0]).cpu().detach().numpy()
+    valsO=(vals[:,1]).cpu().detach().numpy()
 
-    rangeh=torch.ceil(vals.max()-vals.min()).int()+6
+    #print('In Histo2D, vals: ',valsO[:32], dataR[:32])
 
-    print('Range, vals: ',rangeh)
+    # creating futhark object
+    wrapobj = wrapFuthark.HISTOFUTH(dataR, valsO)
+    
+    # warmup call to Futhark wrapper
+    h1, h2, hist10_cl, hist20_cl, histc0_cl = wrapobj.computeHistos()
 
-    #compute indices
+    GPU_RUNS = 100
+    st = time()
+    # count call to Futhark wrapper
+    for idx in range(GPU_RUNS):
+        h1, h2, hist1_cl, hist2_cl, histc_cl = wrapobj.computeHistos()
 
-    t_idx=vals.floor()
 
-    #index array
+    hist_a = hist1_cl.get()
+    hist_b = hist2_cl.get()
+    hist_c = histc_cl.get()
+    et = time()
 
-    p=torch.arange(vals.size(0))
+    print('Futhark Histogram Runtime:', (et-st)/GPU_RUNS )
+    print('Hist_a: ', hist_a[:32])
+    print('Hist_b: ', hist_b[:32])
+    print('Hist_c: ', hist_c[:32])
+    print('h1/2: ', h1, h2)
 
-    #setup varibles
-
-    t=torch.tensor(vals-t_idx,dtype=torch.float32,requires_grad=True,device=device)
-
-    ones4=torch.ones([4,4],dtype=torch.int32,device=device)
-
-    onesp=torch.ones(t.size(0),dtype=torch.int32,device=device)
-
-    stride_x, stride_y=torch.meshgrid([torch.arange(0,4,dtype=torch.int32,device=device)-2, torch.arange(0,4,dtype=torch.int32,device=device)-2])
-
-    t_idx=t_idx.flatten().int()
-
-    indices=torch.einsum('a,bc->abc',t_idx[2*p],ones4)*(rangeh)
-
-    indices+=torch.einsum('a,bc->abc',onesp,stride_x)*rangeh
-
-    indices+=torch.einsum('a,bc->abc',t_idx[2*p+1],ones4)
-
-    indices+=torch.einsum('a,bc->abc',onesp,stride_y)
-
-    a=torch.stack([t.flatten()*0+1, t.flatten(), t.flatten()**2, t.flatten()**3],dim=1) 
-
-    b=torch.tensor(([1, 4, 1, 0],[-3, 0, 3, 0],[3, -6, 3, 0],[-1, 3, -3, 1]),dtype=torch.float32,device=device)/6 
-
-    y=torch.mm(a,b)
-
-    #print(y)
-
-    res=(torch.einsum('ab,ac->abc',y[2*p,:],y[2*p+1,:])).flatten()
-
-    sort_res,nid=torch.sort(indices.flatten())
-
-    v,ids=indices.flatten().unique(return_counts=True)
-
-    val=torch.split(res.flatten(),ids.tolist());
-
-    hist=torch.zeros(v.size(),device=device,dtype=torch.float32)
-
-    va=(v%rangeh)
-
-    vb=((v/rangeh).long())
-
-    for index, value in enumerate(val): 
-
-        hist[index]=value.sum()  
-
-    v_a,ids=va.unique(return_counts=True)
-
-    hist_a=torch.zeros(v_a.size(),device=device,dtype=torch.float32)
-
-    vala=torch.split(hist,ids.tolist());
-
-    for index, value in enumerate(vala): 
-
-        hist_a[index]=value.sum()
-
-    v_b,ids=vb.unique(return_counts=True)
-
-    hist_b=torch.zeros(v_b.size(),device=device,dtype=torch.float32)
-
-    valb=torch.split(hist,ids.tolist());
-
-    for index, value in enumerate(vala): 
-
-        hist_b[index]=value.sum()
-
-    return hist, hist_a, hist_b
+    return hist_c, hist_a, hist_b
 
 #print(y,x.grad)
 
@@ -263,7 +215,8 @@ from time import time
 
 #torch.cuda.empty_cache()
 
-device='cpu'
+#device='cpu'
+device='cuda'
 
 x=torch.zeros([1, 250, 250, 250], dtype=torch.float32, requires_grad=True,device=device)
 
@@ -284,15 +237,11 @@ test_eval,_=LinearSpline3D(pts,x,device,True)
 print('diff',time()-st)
 
 x=torch.rand([2000000,2], dtype=torch.float32,device=device)*50-30
+#x=torch.rand([8000000,2], dtype=torch.float32,device=device)*50-30
 
 x.requires_grad_()
 
-st = time()
-
 histo = Histogram2D(x,device)
-print('Histo2D result: ', histo)
-
-print('Histogram Runtime:',time()-st)
 
 st = time()
 
