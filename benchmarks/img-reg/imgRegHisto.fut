@@ -21,18 +21,22 @@ entry mkImgRegHisto [n] (dataR: [n]f32) (vals: [n]f32) : (i32, i32, []f32, []f32
 
     let det = replicate n 1.0f32
 
-    let f4 lb d x : [4](i32,f32) =
+    let f4 h lb d x : [4](i32,f32) =
             let t  = x - (f32.floor x)
             let t2 = t  * t
             let t3 = t2 * t
-            let vals = [ d*(-t3+3.0*t2-3.0*t+1.0)/6.0, d*(3.0*t3-6.0*t2+4.0)/6.0
-                       , d*(-3.0*t3+3.0*t2+3.0*t+1.0)/6.0,  d*t3/6.0 ]
-            let idxR = 1 + i32.f32 (x - lb)
-            let inds = [ idxR-1, idxR, idxR+1, idxR+2 ]
+            let vals =  [ d*(-t3+3.0*t2-3.0*t+1.0)/6.0
+                        , d*(3.0*t3-6.0*t2+4.0)/6.0
+                        , d*(-3.0*t3+3.0*t2+3.0*t+1.0)/6.0
+                        , d*t3/6.0
+                        ]
+
+            let idxR = i32.f32 <| f32.abs (x - lb)
+            let inds = [ idxR+0, idxR+1, idxR+2, idxR+3 ]
             in  zip inds vals
 
-    let h1_inp = intrinsics.opaque <| transpose <| map2 (f4 lb1) det dataR
-    let h2_inp = intrinsics.opaque <| transpose <| map2 (f4 lb2) det vals
+    let h1_inp = intrinsics.opaque <| transpose <| map2 (f4 h1 lb1) det dataR
+    let h2_inp = intrinsics.opaque <| transpose <| map2 (f4 h2 lb2) det vals
 
     let hc_inp = map(\ ijk ->
                         let i  = ijk >> 4
@@ -42,7 +46,9 @@ entry mkImgRegHisto [n] (dataR: [n]f32) (vals: [n]f32) : (i32, i32, []f32, []f32
 
                         let (i2, v2) = h2_inp[j,i]
                         let (i1, v1) = h1_inp[k,i]
-                        in  (h1*i2 + i1, v2 * v1 / det[i])
+                        let i2' = (i2 + h2 - 1) % h2
+                        let i1' = (i1 + h1 - 1) % h1
+                        in  (h1*i2' + i1', v2 * v1 / det[i])
                     ) (iota (16*n))
 
     let (hc_inds, hc_vals) = unzip hc_inp

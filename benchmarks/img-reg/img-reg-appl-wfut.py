@@ -143,6 +143,9 @@ def Histogram2D(vals,device):
     dataR=(vals[:,0]).cpu().detach().numpy()
     valsO=(vals[:,1]).cpu().detach().numpy()
 
+    #print("inp vals1: ", dataR[:32])
+    #print("inp vals2: ", valsO[:32])
+
     #print('In Histo2D, vals: ',valsO[:32], dataR[:32])
 
     # creating futhark object
@@ -151,7 +154,7 @@ def Histogram2D(vals,device):
     # warmup call to Futhark wrapper
     h1, h2, hist10_cl, hist20_cl, histc0_cl = wrapobj.computeHistos()
 
-    GPU_RUNS = 100
+    GPU_RUNS = 1
     st = time()
     # count call to Futhark wrapper
     for idx in range(GPU_RUNS):
@@ -164,9 +167,10 @@ def Histogram2D(vals,device):
     et = time()
 
     print('Futhark Histogram Runtime:', (et-st)/GPU_RUNS )
-    print('Hist_a: ', hist_a[:32])
-    print('Hist_b: ', hist_b[:32])
-    print('Hist_c: ', hist_c[:32])
+    print('Hist_a: ', hist_a)
+    print('Hist_b: ', hist_b)
+    #print('Hist_c: ', hist_c[:111])
+    #print('Hist_c: ', hist_c[53*50:])
     print('h1/2: ', h1, h2)
 
     return hist_c, hist_a, hist_b
@@ -209,10 +213,6 @@ def SSD(x,device):
 
 #######################################
 
-import torch
-
-from time import time
-
 #torch.cuda.empty_cache()
 
 #device='cpu'
@@ -236,6 +236,7 @@ test_eval,_=LinearSpline3D(pts,x,device,True)
 
 print('diff',time()-st)
 
+torch.manual_seed(123)
 x=torch.rand([2000000,2], dtype=torch.float32,device=device)*50-30
 #x=torch.rand([8000000,2], dtype=torch.float32,device=device)*50-30
 
