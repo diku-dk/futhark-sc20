@@ -135,7 +135,9 @@ def LinearSpline3D(pts,x,device='cpu',return_jac=False):
 def Histogram2D(vals,device):
     #preconpute the range
 
-    rangeh=torch.ceil(vals.max()-vals.min()).int()+6
+    #rangeh=torch.ceil(vals.max()-vals.min()).int()+6
+    lbs = vals.min()
+    rangeh=torch.floor(vals.max()-lbs).int()+4
 
     #compute indices
 
@@ -153,9 +155,10 @@ def Histogram2D(vals,device):
 
     onesp=torch.ones(t.size(0),dtype=torch.int32,device=device)
 
-    stride_x, stride_y=torch.meshgrid([torch.arange(0,4,dtype=torch.int32,device=device)-2, torch.arange(0,4,dtype=torch.int32,device=device)-2])
+    stride_x, stride_y=torch.meshgrid([torch.arange(0,4,dtype=torch.int32,device=device), torch.arange(0,4,dtype=torch.int32,device=device)])
 
-    t_idx=t_idx.flatten().int()
+    #t_idx=t_idx.flatten().int()
+    t_idx=(vals-lbs).abs().flatten().int()
 
     indices=torch.einsum('a,bc->abc',t_idx[2*p],ones4)*(rangeh)
 
@@ -175,7 +178,7 @@ def Histogram2D(vals,device):
 
     res=(torch.einsum('ab,ac->abc',y[2*p,:],y[2*p+1,:])).flatten()
 
-    sort_res,nid=torch.sort(indices.flatten())
+    #sort_res,nid=torch.sort(indices.flatten())
 
     v,ids=indices.flatten().unique(return_counts=True)
 
@@ -268,7 +271,7 @@ st = time()
 
 test_eval,_=CubicBSpline3D(pts,x,device,True)
 
-print('diff',time()-st)
+#print('Cubic Spline',time()-st)
 
 #torch.cuda.empty_cache()
 
@@ -276,32 +279,31 @@ st = time()
 
 test_eval,_=LinearSpline3D(pts,x,device,True)
 
-print('diff',time()-st)
+#print('LinearSpline',time()-st)
 
 torch.manual_seed(123)
 
-x=torch.rand([2000000,2], dtype=torch.float32,device=device)*50-30
-#x=torch.rand([8000000,2], dtype=torch.float32,device=device)*50-30
+#x=torch.rand([2000000,2], dtype=torch.float32,device=device)*50-30
+x=torch.rand([8000000,2], dtype=torch.float32,device=device)*200 #*50-30
 
 x.requires_grad_()
 
+hist_c, hist_a, hist_b = Histogram2D(x,device)
+
 st = time()
 hist_c, hist_a, hist_b = Histogram2D(x,device)
-print('Pytorch GPU Histogram Runtime:',time()-st)
-print('Hist_a: ', hist_a.size(), hist_a)
-print('Hist_b: ', hist_b.size(), hist_b)
-#print('Hist_c: ', hist_c[:111])
+en = time()
+print("Pytorch GPU Histogram Runtime:",en-st)
 
 st = time()
-
 res=SSD(x,device)
-
-#print('diff',time()-st,res,x.grad.data)
-
+#print('SSD',time()-st,res)
 st = time()
 
 resNcc=NCC(x,device)
 
+#print('resNcc time: ', time()-st)
+
 resNcc.backward()
 
-print('diff',time()-st,resNcc)
+#print('diff',time()-st,resNcc)

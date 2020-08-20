@@ -135,18 +135,9 @@ def LinearSpline3D(pts,x,device='cpu',return_jac=False):
 
 # vals is a vector of pairs of values, i.e., (zip vdataR vval) in C code.
 def Histogram2D(vals,device):
-    #print('In Histo2D, shape input: ', vals.shape, vals.size(0))
-    #rangeh=torch.ceil(vals.max()-vals.min()).int()+6
-    #print('Range, vals: ',rangeh)
-
 
     dataR=(vals[:,0]).cpu().detach().numpy()
     valsO=(vals[:,1]).cpu().detach().numpy()
-
-    #print("inp vals1: ", dataR[:32])
-    #print("inp vals2: ", valsO[:32])
-
-    #print('In Histo2D, vals: ',valsO[:32], dataR[:32])
 
     # creating futhark object
     wrapobj = wrapFuthark.HISTOFUTH(dataR, valsO)
@@ -167,11 +158,10 @@ def Histogram2D(vals,device):
     et = time()
 
     print('Futhark Histogram Runtime:', (et-st)/GPU_RUNS )
-    print('Hist_a: ', hist_a)
-    print('Hist_b: ', hist_b)
-    #print('Hist_c: ', hist_c[:111])
-    #print('Hist_c: ', hist_c[53*50:])
-    print('h1/2: ', h1, h2)
+#    print('Hist_a: ', hist_a, sum(hist_a))
+#    print('Hist_b: ', hist_b)
+#    print('Hist_c: ', hist_c[:111])
+#    print('h1/2: ', h1, h2)
 
     return hist_c, hist_a, hist_b
 
@@ -226,7 +216,7 @@ st = time()
 
 test_eval,_=CubicBSpline3D(pts,x,device,True)
 
-print('diff',time()-st)
+#print('diff',time()-st)
 
 #torch.cuda.empty_cache()
 
@@ -234,11 +224,11 @@ st = time()
 
 test_eval,_=LinearSpline3D(pts,x,device,True)
 
-print('diff',time()-st)
+#print('diff',time()-st)
 
 torch.manual_seed(123)
-x=torch.rand([2000000,2], dtype=torch.float32,device=device)*50-30
-#x=torch.rand([8000000,2], dtype=torch.float32,device=device)*50-30
+#x=torch.rand([2000000,2], dtype=torch.float32,device=device)*50-30
+x=torch.rand([8000000,2], dtype=torch.float32,device=device)*200 #*50-30
 
 x.requires_grad_()
 
@@ -256,4 +246,4 @@ resNcc=NCC(x,device)
 
 resNcc.backward()
 
-print('diff',time()-st,resNcc)
+#print('diff',time()-st,resNcc)

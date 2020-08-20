@@ -6,6 +6,7 @@ let reduce_by_index_rf 'a [m] [n] (rf: i32) (dest : *[m]a) (f : a -> a -> a) (ne
 --
 -- input  @ data/large.in
 -- output @ data/large.out
+-- input  @ data/small.in
 
 
 entry mkImgRegHisto [n] (dataR: [n]f32) (vals: [n]f32) : (i32, i32, []f32, []f32, []f32) =
@@ -21,45 +22,43 @@ entry mkImgRegHisto [n] (dataR: [n]f32) (vals: [n]f32) : (i32, i32, []f32, []f32
 
     let det = replicate n 1.0f32
 
-    let f4 h lb d x : [4](i32,f32) =
+    let ff d lb x k =
             let t  = x - (f32.floor x)
             let t2 = t  * t
             let t3 = t2 * t
-            let vals =  [ d*(-t3+3.0*t2-3.0*t+1.0)/6.0
-                        , d*(3.0*t3-6.0*t2+4.0)/6.0
-                        , d*(-3.0*t3+3.0*t2+3.0*t+1.0)/6.0
-                        , d*t3/6.0
-                        ]
-
-            let idxR = i32.f32 <| f32.abs (x - lb)
-            let inds = [ idxR+0, idxR+1, idxR+2, idxR+3 ]
-            in  zip inds vals
-
-    let h1_inp = intrinsics.opaque <| transpose <| map2 (f4 h1 lb1) det dataR
-    let h2_inp = intrinsics.opaque <| transpose <| map2 (f4 h2 lb2) det vals
+            let (a3, a2, a1, a0) =
+                if k==0 then (-1.0f32, 3.0f32, -3.0f32, 1.0f32) else
+                if k==1 then (3.0f32, -6.0f32,  0.0f32, 4.0f32) else
+                if k==2 then (-3.0f32, 3.0f32,  3.0f32, 1.0f32)
+                else         (1.0f32,  0.0f32,  0.0f32, 0.0f32)
+            let valu = a3*t3 + a2*t2 + a1*t + a0
+            let idx = k + ( i32.f32 (x - lb) )
+            in  (idx, d * valu / 6.0f32)
 
     let hc_inp = map(\ ijk ->
                         let i  = ijk >> 4
-                        let jk = ijk &  15
+                        let jk = ijk & 15
                         let j  = jk  >> 2
                         let k  = jk  &  3
 
-                        let (i2, v2) = h2_inp[j,i]
-                        let (i1, v1) = h1_inp[k,i]
-                        let i2' = (i2 + h2 - 1) % h2
-                        let i1' = (i1 + h1 - 1) % h1
-                        in  (h1*i2' + i1', v2 * v1 / det[i])
+                        let d = det[i]
+                        let x1 = dataR[i]
+                        let (i1, v1) = ff d lb1 x1 j
+
+                        let x2 = vals[i]
+                        let (i2, v2) = ff d lb2 x2 k
+
+                        in  (h1*i2 + i1, v2 * v1 / d)
                     ) (iota (16*n))
+
 
     let (hc_inds, hc_vals) = unzip hc_inp
     let histC = reduce_by_index_rf 1i32 (replicate hc 0.0f32) (+) 0.0f32 hc_inds hc_vals
 
-    let h1_inp_flat = flatten h1_inp
-    let (h1_inds, h1_vals) = unzip h1_inp_flat
-    let h2_inp_flat =  flatten h2_inp
-    let (h2_inds, h2_vals) = unzip h2_inp_flat
-    let hist1 = reduce_by_index_rf 1i32 (replicate h1 0.0f32) (+) 0.0f32 h1_inds h1_vals
-    let hist2 = reduce_by_index_rf 1i32 (replicate h2 0.0f32) (+) 0.0f32 h2_inds h2_vals
+    let histC' = unflatten h2 h1 histC
+    let hist2 = map (reduce (+) 0.0f32) histC'
+    let hist1 = map (reduce (+) 0.0f32) <| transpose histC' 
+
     in  (length hist1, length hist2, hist1, hist2, histC)
 
 entry mkImgRegDeriv [n][h] (dataR: [n]f32) (vals: [n]f32) (hist_bar: [h]f32) : ([n]f32, [n]f32) =
