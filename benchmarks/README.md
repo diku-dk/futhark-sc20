@@ -13,6 +13,9 @@ packaged.
   loop from the 435.gromacs benchmark from SPEC CPU2006.  This
   corresponds to section IV.C and part of Table III.
 
+* [img-reg](img-reg/) contains a Futhark port of an image registration
+  program, corresponding to section V.A.4 and part of Table III.
+
 * [kmeans](kmeans/) contains a Futhark implementation of K-means
   clustering, corresponding to section IV.D.1 and part of Table III.
 

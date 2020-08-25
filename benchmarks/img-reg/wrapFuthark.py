@@ -1,6 +1,7 @@
 import numpy
 import pyopencl
 import pyopencl.array as pycl_array
+import os
 
 #from .imgRegHisto import imgRegHisto
 import imgRegHisto
@@ -28,7 +29,7 @@ class HISTOFUTH:
                                     platform_pref=self.platform_id,
                                     device_pref=self.device_id,
                                     default_group_size=256,
-                                    default_num_groups=144)
+                                    default_num_groups=int(os.environ['FUTHARK_NUM_GROUPS']))
 
         self.data1_cl = pycl_array.to_device(self.queue, data1)
         self.data2_cl = pycl_array.to_device(self.queue, data2)
